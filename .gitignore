@@ -41,3 +41,6 @@ luac.out
 
 # general
 .idea
+
+# python
+__pycache__
