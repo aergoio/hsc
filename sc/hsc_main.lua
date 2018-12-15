@@ -7,6 +7,7 @@ MODULE_NAME = "__HSC_MAIN__"
 MODULE_NAME_DB = "__HSC_DB__"
 MODULE_NAME_CMD = "__HSC_CMD__"
 MODULE_NAME_RESULT = "__HSC_RESULT__"
+MODULE_NAME_CONFIG = "__HSC_CONFIG__"
 
 state.var {
   -- contant variables
@@ -48,7 +49,7 @@ function queryCommand(hmc_id, finished, all)
 end
 
 function insertResult(cmd_id, hmc_id, result)
-  system.print(MODULE_NAME .. "insertResult: cmd_id=" .. cmd_id .. ", hmc_id=" .. hmc_id .. ", result=" .. json:encode(result))
+  system.print(MODULE_NAME .. "insertResult")
   __callFunction(MODULE_NAME_RESULT, "insertResult", cmd_id, hmc_id, result)
 end
 
@@ -57,4 +58,20 @@ function queryResult(cmd_id)
   return __callFunction(MODULE_NAME_RESULT, "queryResult", cmd_id)
 end
 
-abi.register(createHordeTables, insertCommand, queryCommand, insertResult, queryResult)
+function registerHordeMaster(hm_id, info)
+  system.print(MODULE_NAME .. "registerHordeMaster")
+  return __callFunction(MODULE_NAME_CONFIG, "registerHordeMaster", hm_id, info)
+end
+
+function queryHordeMaster(hm_id)
+  system.print(MODULE_NAME .. "queryHordeMaster")
+  return __callFunction(MODULE_NAME_CONFIG, "queryHordeMaster", hm_id)
+end
+
+function queryAllHordeMaster()
+  system.print(MODULE_NAME .. "queryAllHordeMaster")
+  return __callFunction(MODULE_NAME_CONFIG, "queryAllHordeMaster")
+end
+
+abi.register(createHordeTables, insertCommand, queryCommand, insertResult, queryResult,
+  registerHordeMaster, queryHordeMaster, queryAllHordeMaster)

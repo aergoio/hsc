@@ -12,9 +12,9 @@ AERGO_WAITING_TIME = 3
 aergo = None
 
 HSC_META = 'hsc_meta.lua'
-HSC_ADDRESS = ""
+HSC_ADDRESS = "AmgP1tsDfnjHyYuANcHqC2jJsjcfaXz2ZiqBaHo3FbgnuPcSB6jU"
 
-DEPLOY_HSC_JSON = '../hsc.payload.dat'
+DEPLOY_HSC_JSON = 'hsc.payload.dat'
 
 
 def exit(error=True):
@@ -93,11 +93,15 @@ def main():
         eprint("Cannot find HSC Address, deploy first.")
         exit()
 
-    global HSC_ADDRESS
-    HSC_ADDRESS = deployed_info[HSC_META]['address']
+    hsc_address = deployed_info[HSC_META]['address']
+    if hsc_address != HSC_ADDRESS:
+        eprint("HSC Address is changed:", hsc_address)
+        eprint("Find out why!!!!!!!!!!")
+        exit()
 
     command = "cmd-" + str(time.time())
 
+    """
     # test: insert command
     call_sc("insertCommand", [command,
                               "AmLaSifmhjHnys8baftuWRiXi8HEJTbthQRPxYrcXEVeZuXviZug",
@@ -145,6 +149,154 @@ def main():
     # test: query result
     result = query_sc("queryResult", cmd_id)
     result = json.loads(result)
+    print(json.dumps(result, indent=2))
+    """
+
+    # test: register Horde
+    info = {
+        "hm_id": "AmLaSifmhjHnys8baftuWRiXi8HEJTbthQRPxYrcXEVeZuXviZug",
+        "cnode_list": [
+            {
+                "cnode_id": "AmLaSif_cnode_A",
+                "container_list": []
+            },
+            {
+                "cnode_id": "AmLaSif_cnode_B",
+            },
+        ]
+    }
+    info = json.dumps(info)
+    call_sc("registerHordeMaster", ["AmLaSifmhjHnys8baftuWRiXi8HEJTbthQRPxYrcXEVeZuXviZug", info])
+
+    # test: query all Horde info
+    result = query_sc("queryAllHordeMaster")
+    result = json.loads(result)
+    print("\n-----------------------")
+    print("All Info for '{}' Hordes".format(len(result)))
+    print("------------------------")
+    print(json.dumps(result, indent=2))
+
+    return
+
+    """
+    info = {
+        "hm_id": "AmLaSifmhjHnys8baftuWRiXi8HEJTbthQRPxYrcXEVeZuXviZug",
+        "cnode_list": [
+            {
+                "cnode_id": "AmLa_cnode_1",
+                "container_list": [
+                    {"container_id": "AmLa_cnode_1_container_1"},
+                    {"container_id": "AmLa_cnode_1_container_2"},
+                    {"container_id": "AmLa_cnode_1_container_3"},
+                ]
+            },
+            {
+                "cnode_id": "AmLa_cnode_2",
+                "container_list": [
+                    {"container_id": "AmLa_cnode_2_container_1"},
+                    {"container_id": "AmLa_cnode_2_container_2"},
+                    {"container_id": "AmLa_cnode_2_container_3"},
+                ]
+            },
+            {
+                "cnode_id": "AmLa_cnode_3",
+                "container_list": [
+                    {"container_id": "AmLa_cnode_3_container_1"},
+                    {"container_id": "AmLa_cnode_3_container_2"},
+                    {"container_id": "AmLa_cnode_3_container_3"},
+                ]
+            },
+        ]
+    }
+    """
+    info = {
+        "hm_id": "AmLaSifmhjHnys8baftuWRiXi8HEJTbthQRPxYrcXEVeZuXviZug",
+        "cnode_list": [
+            {
+                "cnode_id": "AmLa_cnode_1",
+                "container_list": [
+                    {"container_id": "AmLa_cnode_1_container_a"},
+                    {"container_id": "AmLa_cnode_1_container_b"},
+                    {"container_id": "AmLa_cnode_1_container_c"},
+                ]
+            },
+            {
+                "cnode_id": "AmLa_cnode_2",
+                "container_list": [
+                    {"container_id": "AmLa_cnode_2_container_a"},
+                    {"container_id": "AmLa_cnode_2_container_b"},
+                    {"container_id": "AmLa_cnode_2_container_c"},
+                ]
+            },
+            {
+                "cnode_id": "AmLa_cnode_3",
+                "container_list": [
+                    {"container_id": "AmLa_cnode_3_container_a"},
+                    {"container_id": "AmLa_cnode_3_container_b"},
+                    {"container_id": "AmLa_cnode_3_container_c"},
+                ]
+            },
+        ]
+    }
+    info = json.dumps(info)
+    call_sc("registerHordeMaster", ["AmLaSifmhjHnys8baftuWRiXi8HEJTbthQRPxYrcXEVeZuXviZug", info])
+    # >> fail: "ERROR: cannot register Horde with a different ID." on aergo log
+    call_sc("registerHordeMaster", ["AmQNRjb6rtqc6Jc5tsaTupQPAHXaD2EvDcBehyysw8Wbhp1oW1a9", info])
+
+    info = {
+        "hm_id": "AmQNRjb6rtqc6Jc5tsaTupQPAHXaD2EvDcBehyysw8Wbhp1oW1a9",
+        "cnode_list": [
+            {
+                "cnode_id": "AmQN_cnode_1",
+                "container_list": [
+                    {"container_id": "AmQN_cnode_1_container_1"},
+                    {"container_id": "AmQN_cnode_1_container_2"},
+                    {"container_id": "AmQN_cnode_1_container_3"},
+                ]
+            },
+            {
+                "cnode_id": "AmQN_cnode_2",
+                "container_list": [
+                    {"container_id": "AmQN_cnode_2_container_1"},
+                    {"container_id": "AmQN_cnode_2_container_2"},
+                    {"container_id": "AmQN_cnode_2_container_3"},
+                ]
+            },
+            {
+                "cnode_id": "AmQN_cnode_3",
+                "container_list": [
+                    {"container_id": "AmQN_cnode_3_container_1"},
+                    {"container_id": "AmQN_cnode_3_container_2"},
+                    {"container_id": "AmQN_cnode_3_container_3"},
+                ]
+            },
+        ]
+    }
+    info = json.dumps(info)
+    call_sc("registerHordeMaster", ["AmQNRjb6rtqc6Jc5tsaTupQPAHXaD2EvDcBehyysw8Wbhp1oW1a9", info])
+
+    # test: query Horde info
+    result = query_sc("queryHordeMaster", "AmLaSifmhjHnys8baftuWRiXi8HEJTbthQRPxYrcXEVeZuXviZug")
+    result = json.loads(result)
+    print("\n--------------------------------")
+    print("'{0}' CNodes Info for Horde: \n{1}".format(len(result['cnode_list']), result['hm_id']))
+    print("--------------------------------")
+    print(json.dumps(result, indent=2))
+
+    # test: query Horde info
+    result = query_sc("queryHordeMaster", "AmQNRjb6rtqc6Jc5tsaTupQPAHXaD2EvDcBehyysw8Wbhp1oW1a9")
+    result = json.loads(result)
+    print("\n--------------------------------")
+    print("'{0}' CNodes Info for Horde: \n{1}".format(len(result['cnode_list']), result['hm_id']))
+    print("--------------------------------")
+    print(json.dumps(result, indent=2))
+
+    # test: query all Horde info
+    result = query_sc("queryAllHordeMaster")
+    result = json.loads(result)
+    print("\n-----------------------")
+    print("All Info for '{}' Hordes".format(len(result)))
+    print("------------------------")
     print(json.dumps(result, indent=2))
 
 

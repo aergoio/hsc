@@ -64,10 +64,12 @@ function __init_module__(module_name, address)
 end
 
 function __call_module_function__(module_name, func_name, ...)
-  system.print(MODULE_NAME .. "__call_module_function__: module_name=" .. module_name .. ", func_name=" .. func_name)
+  system.print(MODULE_NAME .. "__call_module_function__: module_name=" .. module_name)
 
   local address = __getModuleAddress(module_name)
-  system.print("address=" .. address)
+
+  system.print(MODULE_NAME .. "__call_module_function__: address=" .. address .. ", func_name=" .. func_name)
+
   return contract.call(address, func_name, ...)
 end
 
@@ -106,6 +108,22 @@ function queryResult(cmd_id)
   return __callFunction(MODULE_NAME_MAIN, "queryResult", cmd_id)
 end
 
+function registerHordeMaster(hm_id, info)
+  system.print(MODULE_NAME .. "registerHordeMaster")
+  return __callFunction(MODULE_NAME_MAIN, "registerHordeMaster", hm_id, info)
+end
+
+function queryHordeMaster(hm_id)
+  system.print(MODULE_NAME .. "queryHordeMaster")
+  return __callFunction(MODULE_NAME_MAIN, "queryHordeMaster", hm_id)
+end
+
+function queryAllHordeMaster()
+  system.print(MODULE_NAME .. "queryAllHordeMaster")
+  return __callFunction(MODULE_NAME_MAIN, "queryAllHordeMaster")
+end
+
 -- exposed functions
-abi.register(createHordeTables, insertCommand, queryCommand, insertResult, queryResult)
+abi.register(createHordeTables, insertCommand, queryCommand, insertResult, queryResult,
+  registerHordeMaster, queryHordeMaster, queryAllHordeMaster)
 

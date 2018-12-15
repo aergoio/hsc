@@ -219,5 +219,109 @@ function queryResult(cmd_id)
   return result_list
 end
 
-abi.register(createHordeTables, insertCommand, insertCommandTarget, updateCommandTarget,
-  queryAllCommands, queryFinishedCommands, queryNotFinishedCommands, insertResult, queryResult)
+function insertHordeInfo(hm_id, cnode_id, container_id)
+  system.print(MODULE_NAME .. "insertHordeInfo: hm_id=" .. hm_id .. ", cnode_id=".. cnode_id)
+
+  -- insert Horde info
+  local stmt = db.prepare("INSERT OR REPLACE INTO master_conf(hm_id, cnode_id, container_id) VALUES (?, ?, ?)")
+  stmt:exec(hm_id, cnode_id, container_id)
+end
+
+function queryHordeInfo(hm_id)
+  system.print(MODULE_NAME .. "queryHordeInfo: hm_id=" .. hm_id)
+
+  local hm_info = {
+    hm_id = hm_id,
+    cnode_list = {}
+  }
+
+  local stmt = db.prepare("SELECT cnode_id, container_id FROM master_conf WHERE hm_id = ? ORDER BY hm_id, cnode_id")
+  local rs = stmt:query(hm_id)
+
+  local cnode_id = ""
+  local cnode_idx = 0
+  local container_idx = 1
+  while rs:next() do
+    local col1, col2 = rs:get()
+
+    -- collect cnode_id
+    if col1 ~= cnode_id then
+      cnode_id = col1
+      cnode_idx = cnode_idx + 1
+      hm_info.cnode_list[cnode_idx] = {
+        cnode_id = cnode_id,
+        container_list = {}
+      }
+      container_idx = 1
+    end
+
+    -- collect container_id
+    if col2 ~= nil then
+      hm_info.cnode_list[cnode_idx].container_list[container_idx] = {
+        container_id = col2
+      }
+      container_idx = container_idx + 1
+    end
+  end
+
+  return hm_info
+end
+
+function queryAllHordeInfo()
+  system.print(MODULE_NAME .. "queryAllHordeInfo")
+
+  local hm_list = {}
+
+  local stmt = db.prepare("SELECT hm_id, cnode_id, container_id FROM master_conf ORDER BY hm_id, cnode_id")
+  local rs = stmt:query()
+
+  local hm_id = ""
+  local hm_idx = 0
+  local cnode_id = ""
+  local cnode_idx = 0
+  local container_idx = 1
+  while rs:next() do
+    local col1, col2, col3 = rs:get()
+
+    -- collect hm_id
+    if col1 ~= hm_id then
+      hm_id = col1
+      hm_idx = hm_idx + 1
+      hm_list[hm_idx] = {
+        hm_id = hm_id,
+        cnode_list = {}
+      }
+      cnode_id = ""
+      cnode_idx = 0
+    end
+
+    local hm_info = hm_list[hm_idx]
+
+    -- collect cnode_id
+    if col2 ~= cnode_id then
+      cnode_id = col2
+      cnode_idx = cnode_idx + 1
+      hm_info.cnode_list[cnode_idx] = {
+        cnode_id = cnode_id,
+        container_list = {}
+      }
+      container_idx = 1
+    end
+
+    -- collect container_id
+    if col3 ~= nil then
+      hm_info.cnode_list[cnode_idx].container_list[container_idx] = {
+        container_id = col3
+      }
+      container_idx = container_idx + 1
+    end
+  end
+
+  return hm_list
+end
+
+abi.register(createHordeTables, insertCommand,
+  insertCommandTarget, updateCommandTarget,
+  queryAllCommands, queryFinishedCommands, queryNotFinishedCommands,
+  insertResult, queryResult,
+  insertHordeInfo, queryHordeInfo, queryAllHordeInfo)
