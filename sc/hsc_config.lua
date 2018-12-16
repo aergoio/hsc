@@ -63,9 +63,9 @@ function queryHordeMaster(hm_id)
   return __callFunction(MODULE_NAME_DB, "queryHordeInfo", hm_id)
 end
 
-function queryAllHordeMaster()
-  system.print(MODULE_NAME .. "queryAllHordeMaster")
+function queryAllHordeMasters()
+  system.print(MODULE_NAME .. "queryAllHordeMasters")
   return __callFunction(MODULE_NAME_DB, "queryAllHordeInfo")
 end
 
-abi.register(registerHordeMaster, queryHordeMaster, queryAllHordeMaster)
+abi.register(registerHordeMaster, queryHordeMaster, queryAllHordeMasters)

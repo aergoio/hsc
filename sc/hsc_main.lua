@@ -68,10 +68,10 @@ function queryHordeMaster(hm_id)
   return __callFunction(MODULE_NAME_CONFIG, "queryHordeMaster", hm_id)
 end
 
-function queryAllHordeMaster()
-  system.print(MODULE_NAME .. "queryAllHordeMaster")
-  return __callFunction(MODULE_NAME_CONFIG, "queryAllHordeMaster")
+function queryAllHordeMasters()
+  system.print(MODULE_NAME .. "queryAllHordeMasters")
+  return __callFunction(MODULE_NAME_CONFIG, "queryAllHordeMasters")
 end
 
 abi.register(createHordeTables, insertCommand, queryCommand, insertResult, queryResult,
-  registerHordeMaster, queryHordeMaster, queryAllHordeMaster)
+  registerHordeMaster, queryHordeMaster, queryAllHordeMasters)
