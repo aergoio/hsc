@@ -183,6 +183,9 @@ def hsc_deploy(aergo, payload_info):
 if __name__ == '__main__':
     try:
         aergo = check_aergo_conn_info(AERGO_TARGET, AERGO_PRIVATE_KEY, AERGO_ACCOUNT_PASSWORD)
+        aergo.get_account()
+        print("--------- Get Account Info -----------")
+        print(aergo.account)
 
         # read payload info.
         payload_info = read_payload_info()
