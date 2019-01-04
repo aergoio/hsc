@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "cc54c7efb326406369090ddb9a2fd266101500f91d822d03a189839a5254bfca"
+            "sha256": "68e9fee3faec3e39c7a73a54a00dfc649bcb8bd91395c4335d7f0e0c5d34b278"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -18,10 +18,11 @@
     "default": {
         "aergo-herapy": {
             "hashes": [
-                "sha256:54780b5be4f555b24f95b70d8d9058c0b89a105b08a7075c185e8b496ae8b762"
+                "sha256:8ea66ed8ed4169d57135ac2c33836578ca4244b10af07b5a8b6c3fc1d868cf34",
+                "sha256:d9777be96f2686a571ac179fba621928be2ccb4ce5d6bb1bb56e3c73b3af242a"
             ],
             "index": "pypi",
-            "version": "==0.1.21"
+            "version": "==0.9.2"
         },
         "asn1crypto": {
             "hashes": [
@@ -32,11 +33,11 @@
         },
         "base58": {
             "hashes": [
-                "sha256:4d21426893a3190c17397dea1307aebf5c34676eb7180c1f8fa865e42df54709",
-                "sha256:53c7a0174077fb1e654fcef15dbcb44676f2521ab43882c170a0e4be6dcc97a5",
-                "sha256:e8c8cfae5ea66cb77c3cc2bec9bebede61e5b4ecc7c7227643e119ba94c0537f"
+                "sha256:1e42993c0628ed4f898c03b522b26af78fb05115732549b21a028bc4633d19ab",
+                "sha256:6aa0553e477478993588303c54659d15e3c17ae062508c854a8b752d07c716bd",
+                "sha256:9a793c599979c497800eb414c852b80866f28daaed5494703fc129592cc83e60"
             ],
-            "version": "==1.0.2"
+            "version": "==1.0.3"
         },
         "cffi": {
             "hashes": [
@@ -74,6 +75,14 @@
                 "sha256:fdf1c1dc5bafc32bc5d08b054f94d659422b05aba244d6be4ddc1c72d9aa70fb"
             ],
             "version": "==1.11.5"
+        },
+        "click": {
+            "hashes": [
+                "sha256:2335065e6395b9e67ca716de5f7526736bfa6ceead690adf616d925bdc622b13",
+                "sha256:5b94b49521f6456670fdb30cd82a4eca9412788a93fa6dd6df72c94d5a8ff2d7"
+            ],
+            "index": "pypi",
+            "version": "==7.0"
         },
         "cryptography": {
             "hashes": [

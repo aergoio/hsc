@@ -4,7 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-aergo-herapy = "*"
+aergo-herapy = ">=0.9.2"
+click = "*"
 
 [dev-packages]
 
