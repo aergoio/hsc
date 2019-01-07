@@ -20,10 +20,23 @@ local function __init__()
   )]])
   local stmt = db.prepare("INSERT INTO modules(name, address) VALUES (?, ?)")
   stmt:exec(MODULE_NAME, scAddress)
+
+  system.setItem(MODULE_NAME .. "__CREATOR__", system.getSender())
+end
+
+local function __getOwner()
+  return system.getItem(MODULE_NAME .. "__CREATOR__")
 end
 
 local function __callFunction(module_name, func_name, ...)
   system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name .. ", func_name=" .. func_name)
+
+  if __getOwner() ~= system.getSender() then
+    system.print(MODULE_NAME .. "__callFunction: ERROR: might not be authorized sender: " .. system.getSender())
+    -- TODO: need raise security error
+    --return
+  end
+
   return __call_module_function__(module_name, func_name, ...)
 end
 
@@ -42,7 +55,7 @@ local function __getModuleAddress(name)
 end
 
 function __init_module__(module_name, address)
-  if  MODULE_NAME == module_name then
+  if MODULE_NAME == module_name then
     system.print(MODULE_NAME .. "__init_module__: ERROR: cannot initialize META module.")
     -- TODO: need raise default module error
     return
