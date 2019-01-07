@@ -82,7 +82,7 @@ def main():
     global aergo
     aergo = herapy.Aergo()
     aergo.connect(AERGO_TARGET)
-    aergo.new_account(password=AERGO_ACCOUNT_PASSWORD, private_key=AERGO_PRIVATE_KEY)
+    aergo.new_account(private_key=AERGO_PRIVATE_KEY)
 
     # read deploy json
     if os.path.isfile(DEPLOY_HSC_JSON):
