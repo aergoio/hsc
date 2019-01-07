@@ -1,23 +1,19 @@
 import os
 import sys
+import click
 import traceback
 import json
 import aergo.herapy as herapy
 import time
 
-AERGO_TARGET = "localhost:7845"
+HSC_VERSION="Horde Smart Contract v0.1.0"
+
+AERGO_TARGET = "testnet.aergo.io:7845"
 AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
-AERGO_ACCOUNT_PASSWORD = "coolguy"
 AERGO_WAITING_TIME = 3
 
 if 'AERGO_TARGET' in os.environ:
     AERGO_TARGET = os.environ['AERGO_TARGET']
-
-if 'AERGO_PRIVATE_KEY' in os.environ:
-    AERGO_PRIVATE_KEY = os.environ['AERGO_PRIVATE_KEY']
-
-if 'AERGO_ACCOUNT_PASSWORD' in os.environ:
-    AERGO_ACCOUNT_PASSWORD = os.environ['AERGO_ACCOUNT_PASSWORD']
 
 if 'AERGO_WAITING_TIME' in os.environ:
     AERGO_WAITING_TIME = os.environ['AERGO_WAITING_TIME']
@@ -42,9 +38,6 @@ HSC_PAYLOAD_DATA = "./hsc.payload.dat"
 
 
 def exit(error=True):
-    if aergo is not None:
-        aergo.disconnect()
-
     """
     if error:
         try:
@@ -79,10 +72,16 @@ def write_payload_info(payload_info):
         f.close()
 
 
-def check_aergo_conn_info(target, private_key, password):
+def check_aergo_conn_info(target, private_key):
     aergo = herapy.Aergo()
     aergo.connect(target)
-    aergo.new_account(password=password, private_key=private_key)
+    aergo.new_account(private_key=private_key)
+
+    if private_key is None:
+        print("Account:")
+        print("  Private Key: " + str(aergo.account.private_key))
+        print("  Address: " + str(aergo.account.address))
+
     return aergo
 
 
@@ -124,12 +123,18 @@ def call_sc(aergo, hsc_address, func_name, args=None):
         exit()
 
 
+def query_sc(aergo, hsc_address, func_name, args=None):
+    # send TX
+    result = aergo.query_sc(hsc_address, func_name, args=args)
+    return result
+
+
 def try_to_deploy(aergo, key, payload_info, args=None, force=False):
     if key not in payload_info:
         return False
 
     if not force:
-        if payload_info[key]['deployed'] and not payload_info[key]['changed']:
+        if payload_info[key]['deployed'] and not payload_info[key]['compiled']:
             return False
 
     address = deploy_sc(aergo, payload_info[key]['payload'], args)
@@ -141,14 +146,28 @@ def try_to_deploy(aergo, key, payload_info, args=None, force=False):
 def hsc_deploy(aergo, payload_info):
     print("Compiling Horde Smart Contract (HSC)")
 
-    # at first always check HSC_META
-    if try_to_deploy(aergo, HSC_META, payload_info):
+    # at first check whether HSC is deployed or not
+    try:
+        version = query_sc(aergo, payload_info['hsc_address'], "getVersion")
+        version = version.decode('utf-8')
+        if HSC_VERSION in version:
+            need_to_change_all = False
+        else:
+            need_to_change_all = True
+    except:
         need_to_change_all = True
-        print("  > deployed ...", HSC_META)
+
+    # at first always check HSC_META
+    if need_to_change_all:
+        try_to_deploy(aergo, HSC_META, payload_info, need_to_change_all)
     else:
-        need_to_change_all = False
-        print("  > ............", HSC_META)
-    payload_info[HSC_META]['changed'] = False
+        if try_to_deploy(aergo, HSC_META, payload_info):
+            need_to_change_all = True
+            print("  > deployed ...", HSC_META)
+        else:
+            need_to_change_all = False
+            print("  > ............", HSC_META)
+    payload_info[HSC_META]['compiled'] = False
     payload_info[HSC_META]['deployed'] = True
 
     hsc_address = payload_info[HSC_META]['address']
@@ -160,7 +179,7 @@ def hsc_deploy(aergo, payload_info):
 
         if try_to_deploy(aergo, key, payload_info, hsc_address, need_to_change_all):
             print("  > deployed ...", key)
-            payload_info[key]['changed'] = False
+            payload_info[key]['compiled'] = False
             payload_info[key]['deployed'] = True
         else:
             if key not in payload_info:
@@ -168,8 +187,11 @@ def hsc_deploy(aergo, payload_info):
                 continue
             else:
                 print("  > ............", key)
-                payload_info[key]['changed'] = False
+                payload_info[key]['compiled'] = False
                 payload_info[key]['deployed'] = True
+
+    # creating Horde tables
+    call_sc(aergo, hsc_address, "createHordeTables")
 
     print()
     print("Horde Smart Contract Address =", hsc_address)
@@ -180,12 +202,29 @@ def hsc_deploy(aergo, payload_info):
     return hsc_address
 
 
-if __name__ == '__main__':
+@click.group(invoke_without_command=True)
+@click.option('--target', default=AERGO_TARGET, help='target AERGO for Horde configuration')
+@click.option('--private-key', help='the private key to create Horde Smart Contract. If not set, it will be random')
+@click.option('--waiting-time', default=AERGO_WAITING_TIME, help='the private key to create Horde Smart Contract')
+def main(target, private_key, waiting_time):
+    global AERGO_WAITING_TIME
+    AERGO_WAITING_TIME = waiting_time
+
     try:
-        aergo = check_aergo_conn_info(AERGO_TARGET, AERGO_PRIVATE_KEY, AERGO_ACCOUNT_PASSWORD)
+        aergo = check_aergo_conn_info(target, private_key)
         aergo.get_account()
         print("--------- Get Account Info -----------")
-        print(aergo.account)
+        print('    - Nonce:        %s' % aergo.account.nonce)
+        print('    - balance:      %s' % aergo.account.balance.aergo)
+
+        if target == AERGO_TARGET and int(aergo.account.balance) == 0:
+            print("Not enough balance.\n")
+            print("You need to request AERGO tokens on\n\n  https://faucet.aergoscan.io/\n")
+            print("with the address:")
+            print("\n  %s\n" % aergo.account.address)
+            print("And deploy again with the private key:")
+            print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
+            exit()
 
         # read payload info.
         payload_info = read_payload_info()
@@ -202,3 +241,7 @@ if __name__ == '__main__':
     except Exception:
         traceback.print_exception(*sys.exc_info())
         exit()
+
+
+if __name__ == '__main__':
+    main(obj={})

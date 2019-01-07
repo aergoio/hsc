@@ -7,7 +7,6 @@ import aergo.herapy as herapy
 
 AERGO_TARGET = "localhost:7845"
 AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
-AERGO_ACCOUNT_PASSWORD = "coolguy"
 AERGO_WAITING_TIME = 3
 aergo = None
 
@@ -70,10 +69,6 @@ def main():
     if 'AERGO_PRIVATE_KEY' in os.environ:
         global AERGO_PRIVATE_KEY
         AERGO_PRIVATE_KEY = os.environ['AERGO_PRIVATE_KEY']
-
-    if 'AERGO_ACCOUNT_PASSWORD' in os.environ:
-        global AERGO_ACCOUNT_PASSWORD
-        AERGO_ACCOUNT_PASSWORD = os.environ['AERGO_ACCOUNT_PASSWORD']
 
     if 'AERGO_WAITING_TIME' in os.environ:
         global AERGO_WAITING_TIME

@@ -52,11 +52,10 @@ def check_aergo_path():
     elif 'GOPATH' in os.environ:
         g_aergo_path = (os.environ['GOPATH'])
     else:
-        eprint("cannot find AERGO_PATH")
+        eprint("ERROR: Cannot find AERGO_PATH")
         exit()
 
     print("  > AERGO_PATH: ", g_aergo_path)
-    print()
 
 
 def search_file(dir):
@@ -77,14 +76,17 @@ def search_file(dir):
 
 
 def check_aergo_luac_path():
-    search_file(g_aergo_path)
+    try:
+        search_file(g_aergo_path)
+    except FileNotFoundError:
+        eprint("ERROR: Cannot find AERGO_PATH for finding AERGO Lua Compiler (aergoluac)")
+        exit()
 
     if g_aergo_luac_path is None or 0 == len(g_aergo_luac_path):
-        eprint("Cannot find AERGO Lua Compiler (aergoluac)")
+        eprint("ERROR: Cannot find AERGO Lua Compiler (aergoluac)")
         exit()
 
     print("  > 'aergoluac': ", g_aergo_luac_path)
-    print()
 
 
 def read_payload_info():
@@ -112,7 +114,7 @@ def compile_src(src):
                                stderr=subprocess.PIPE)
     out, err = process.communicate()
     if err is not None and len(err) != 0:
-        eprint("Fail to run 'aergoluac': {}".format(err))
+        eprint("ERROR: Fail to run 'aergoluac': {}".format(err))
         exit()
 
     # get payload
@@ -123,7 +125,7 @@ def check_src_payload(key, payload_info, force=False):
     src = os.path.join(HSC_SRC_DIR, key)
     src = os.path.abspath(src)
     if not os.path.isfile(src):
-        eprint("Cannot find the source file: {}".format(src))
+        eprint("ERROR: Cannot find the source file: {}".format(src))
         return True
 
     payload = compile_src(src)
@@ -132,7 +134,7 @@ def check_src_payload(key, payload_info, force=False):
         payload_info[key] = {
             'src': src,
             'payload': payload,
-            'changed': True,
+            'compiled': True,
             'deployed': False
         }
         return True
@@ -141,22 +143,23 @@ def check_src_payload(key, payload_info, force=False):
 
     if force:
         payload_info[key]['payload'] = payload
-        payload_info[key]['changed'] = True
+        payload_info[key]['compiled'] = True
         payload_info[key]['deployed'] = False
     else:
         if payload_info[key]['payload'] == payload:
-            payload_info[key]['changed'] = False
+            payload_info[key]['compiled'] = False
         else:
             payload_info[key]['payload'] = payload
-            payload_info[key]['changed'] = True
+            payload_info[key]['compiled'] = True
             payload_info[key]['deployed'] = False
 
-    return payload_info[key]['changed']
+    return payload_info[key]['compiled']
 
 
 def hsc_compile():
     check_aergo_path()
     check_aergo_luac_path()
+    print()
 
     print("Compiling Horde Smart Contract (HSC)")
     payload_info = read_payload_info()

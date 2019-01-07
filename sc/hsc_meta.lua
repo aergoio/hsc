@@ -83,6 +83,11 @@ function constructor()
   system.print(MODULE_NAME .. "constructor")
 end
 
+function getVersion()
+  system.print(MODULE_NAME .. "getVersion")
+  return "Horde Smart Contract v0.1.0"
+end
+
 function createHordeTables()
   system.print(MODULE_NAME .. "createHordeTables")
   return __callFunction(MODULE_NAME_MAIN, "createHordeTables")
@@ -124,6 +129,7 @@ function queryAllHordeMasters()
 end
 
 -- exposed functions
-abi.register(createHordeTables, insertCommand, queryCommand, insertResult, queryResult,
+abi.register(getVersion, createHordeTables, insertCommand, queryCommand,
+  insertResult, queryResult,
   registerHordeMaster, queryHordeMaster, queryAllHordeMasters)
 
