@@ -6,7 +6,7 @@ import json
 import aergo.herapy as herapy
 import time
 
-HSC_VERSION="Horde Smart Contract v0.1.0"
+HSC_VERSION="v0.1.1"
 
 AERGO_TARGET = "testnet.aergo.io:7845"
 AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
@@ -144,22 +144,28 @@ def try_to_deploy(aergo, key, payload_info, args=None, force=False):
 
 
 def hsc_deploy(aergo, payload_info):
-    print("Compiling Horde Smart Contract (HSC)")
+    print("Deploying Horde Smart Contract (HSC)")
+
+    if payload_info is None or 'hsc_address' not in payload_info:
+        hsc_address = None
+    else:
+        hsc_address = payload_info['hsc_address']
 
     # at first check whether HSC is deployed or not
     try:
-        version = query_sc(aergo, payload_info['hsc_address'], "getVersion")
+        version = query_sc(aergo, hsc_address, "getVersion")
         version = version.decode('utf-8')
         if HSC_VERSION in version:
             need_to_change_all = False
         else:
+            print("Version is different: (expect) \"{0}\" != (deployed) {1}".format(HSC_VERSION, version))
             need_to_change_all = True
     except:
         need_to_change_all = True
 
     # at first always check HSC_META
     if need_to_change_all:
-        try_to_deploy(aergo, HSC_META, payload_info, need_to_change_all)
+        try_to_deploy(aergo, HSC_META, payload_info, force=need_to_change_all)
     else:
         if try_to_deploy(aergo, HSC_META, payload_info):
             need_to_change_all = True
@@ -177,7 +183,7 @@ def hsc_deploy(aergo, payload_info):
         if key == HSC_META:
             continue
 
-        if try_to_deploy(aergo, key, payload_info, hsc_address, need_to_change_all):
+        if try_to_deploy(aergo, key, payload_info, hsc_address, force=need_to_change_all):
             print("  > deployed ...", key)
             payload_info[key]['compiled'] = False
             payload_info[key]['deployed'] = True
@@ -189,6 +195,9 @@ def hsc_deploy(aergo, payload_info):
                 print("  > ............", key)
                 payload_info[key]['compiled'] = False
                 payload_info[key]['deployed'] = True
+
+    # set HSC version
+    call_sc(aergo, hsc_address, "setVersion", [HSC_VERSION])
 
     # creating Horde tables
     call_sc(aergo, hsc_address, "createHordeTables")
@@ -233,9 +242,6 @@ def main(target, private_key, waiting_time):
 
         # save payload info.
         write_payload_info(payload_info)
-
-        # create Horde tables
-        call_sc(aergo, hsc_address, "createHordeTables")
 
         exit(False)
     except Exception:

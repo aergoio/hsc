@@ -99,18 +99,6 @@ You need to remember
 * the private key of the account (ie. "6iaJPeExEcxMpj5zTQAQjTLnnkzU1Rjp5EZWvpzuucXdRRHUiyd")
 * and HSC address (ie. "AmhmYAtCEw2Q9ZXEaJRbXuBKRv8vPQn9R3Vf24YgG5cbQbTKg519")
 
-# Create DB Tables
-After deploying, you need to create tables on the Aergo configuration blockchain to start the Horde System.
-```python
-import aergo.herapy as herapy
-aergo = herapy.Aergo()
-aergo.connect("localhost:7845")
-aergo.new_account(private_key="6iaJPeExEcxMpj5zTQAQjTLnnkzU1Rjp5EZWvpzuucXdRRHUiyd")
-aergo.call_sc(sc_address="AmhmYAtCEw2Q9ZXEaJRbXuBKRv8vPQn9R3Vf24YgG5cbQbTKg519", 
-              func_name="createHordeTables")
-aergo.disconnect()
-```
-
 # Check HSC address
 You can check the deployed HSC address again.
 ```bash

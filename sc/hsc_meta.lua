@@ -83,9 +83,14 @@ function constructor()
   system.print(MODULE_NAME .. "constructor")
 end
 
+function setVersion(version)
+  system.print(MODULE_NAME .. "setVersion")
+  system.setItem(MODULE_NAME .. "_VERSION__", version)
+end
+
 function getVersion()
   system.print(MODULE_NAME .. "getVersion")
-  return "Horde Smart Contract v0.1.0"
+  return system.getItem(MODULE_NAME .. "_VERSION__")
 end
 
 function createHordeTables()
@@ -129,7 +134,7 @@ function queryAllHordeMasters()
 end
 
 -- exposed functions
-abi.register(getVersion, createHordeTables, insertCommand, queryCommand,
+abi.register(setVersion, getVersion, createHordeTables, insertCommand, queryCommand,
   insertResult, queryResult,
   registerHordeMaster, queryHordeMaster, queryAllHordeMasters)
 
