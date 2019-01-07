@@ -156,6 +156,7 @@ def hsc_deploy(aergo, payload_info):
         version = query_sc(aergo, hsc_address, "getVersion")
         version = version.decode('utf-8')
         if HSC_VERSION in version:
+            print("HSC is already deployed (Version: {})".format(version))
             need_to_change_all = False
         else:
             print("Version is different: (expect) \"{0}\" != (deployed) {1}".format(HSC_VERSION, version))
@@ -222,7 +223,7 @@ def main(target, private_key, waiting_time):
     try:
         aergo = check_aergo_conn_info(target, private_key)
         aergo.get_account()
-        print("--------- Get Account Info -----------")
+        print("  > Account Info")
         print('    - Nonce:        %s' % aergo.account.nonce)
         print('    - balance:      %s' % aergo.account.balance.aergo)
 
