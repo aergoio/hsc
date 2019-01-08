@@ -19,19 +19,19 @@ if 'AERGO_WAITING_TIME' in os.environ:
     AERGO_WAITING_TIME = os.environ['AERGO_WAITING_TIME']
 
 HSC_META = 'hsc_meta.lua'
-HSC_MAIN = 'hsc_main.lua'
 HSC_DB = 'hsc_db.lua'
 HSC_CMD = 'hsc_cmd.lua'
 HSC_RESULT = 'hsc_result.lua'
 HSC_CONFIG = 'hsc_config.lua'
+HSC_POND = 'hsc_pond.lua'
 
 HSC_SRC_LIST = [
     HSC_META,
-    HSC_MAIN,
     HSC_DB,
     HSC_CMD,
     HSC_RESULT,
     HSC_CONFIG,
+    HSC_POND,
 ]
 
 HSC_PAYLOAD_DATA = "./hsc.payload.dat"
@@ -164,9 +164,10 @@ def hsc_deploy(aergo, payload_info):
     except:
         need_to_change_all = True
 
-    # at first always check HSC_META
+    # always check HSC_META
     if need_to_change_all:
         try_to_deploy(aergo, HSC_META, payload_info, force=need_to_change_all)
+        print("  > deployed ...", HSC_META)
     else:
         if try_to_deploy(aergo, HSC_META, payload_info):
             need_to_change_all = True
@@ -179,9 +180,23 @@ def hsc_deploy(aergo, payload_info):
 
     hsc_address = payload_info[HSC_META]['address']
 
+    # always check HSC_DB
+    if need_to_change_all:
+        try_to_deploy(aergo, HSC_DB, payload_info, hsc_address, force=need_to_change_all)
+        print("  > deployed ...", HSC_DB)
+    else:
+        if try_to_deploy(aergo, HSC_DB, payload_info, hsc_address):
+            need_to_change_all = True
+            print("  > deployed ...", HSC_DB)
+        else:
+            need_to_change_all = False
+            print("  > ............", HSC_DB)
+    payload_info[HSC_DB]['compiled'] = False
+    payload_info[HSC_DB]['deployed'] = True
+
     # check other sources
     for key in HSC_SRC_LIST:
-        if key == HSC_META:
+        if key == HSC_META or key == HSC_DB:
             continue
 
         if try_to_deploy(aergo, key, payload_info, hsc_address, force=need_to_change_all):

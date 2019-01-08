@@ -28,6 +28,31 @@ function constructor(metaAddress)
   system.print(MODULE_NAME .. "constructor")
 end
 
+function createTable(sql)
+  system.print(MODULE_NAME .. "createTable: sql=" .. sql)
+  db.exec(sql)
+end
+
+function insert(sql, ...)
+  system.print(MODULE_NAME .. "insert: sql=" .. sql .. ", args=" .. json:encode({...}))
+  local stmt = db.prepare(sql)
+  stmt:exec(...)
+end
+
+function select(sql, ...)
+  system.print(MODULE_NAME .. "select: sql=" .. sql .. ", args=" .. json:encode({...}))
+
+  local stmt = db.prepare(sql)
+  local rs = stmt:query(...)
+  local rows = {}
+
+  while rs:next() do
+    table.insert(rows, { rs:get() })
+  end
+
+  return rows
+end
+
 function createHordeTables()
   system.print(MODULE_NAME .. "createHordeTables")
 
@@ -120,7 +145,6 @@ function queryAllCommands(hmc_id)
       cmd = col2,
       finished = tostring(col3)
     }
-    system.print("123123123==========" .. tostring(col3))
     table.insert(cmd_list, item)
   end
 
@@ -320,7 +344,8 @@ function queryAllHordeInfo()
   return hm_list
 end
 
-abi.register(createHordeTables, insertCommand,
+abi.register(createTable, insert, select,
+  createHordeTables, insertCommand,
   insertCommandTarget, updateCommandTarget,
   queryAllCommands, queryFinishedCommands, queryNotFinishedCommands,
   insertResult, queryResult,

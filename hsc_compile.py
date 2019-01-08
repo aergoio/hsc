@@ -5,20 +5,20 @@ import subprocess
 import json
 
 HSC_META = 'hsc_meta.lua'
-HSC_MAIN = 'hsc_main.lua'
 HSC_DB = 'hsc_db.lua'
 HSC_CMD = 'hsc_cmd.lua'
 HSC_RESULT = 'hsc_result.lua'
 HSC_CONFIG = 'hsc_config.lua'
+HSC_POND = 'hsc_pond.lua'
 
 HSC_SRC_DIR = "./sc/"
 HSC_SRC_LIST = [
     HSC_META,
-    HSC_MAIN,
     HSC_DB,
     HSC_CMD,
     HSC_RESULT,
     HSC_CONFIG,
+    HSC_POND,
 ]
 
 HSC_PAYLOAD_DATA = "./hsc.payload.dat"
