@@ -133,14 +133,14 @@ function queryResult(cmd_id)
   return __callFunction(MODULE_NAME_RESULT, "queryResult", cmd_id)
 end
 
-function registerHordeMaster(hm_id, info)
+function registerHordeMaster(hmc_id, info)
   system.print(MODULE_NAME .. "registerHordeMaster")
-  return __callFunction(MODULE_NAME_CONFIG, "registerHordeMaster", hm_id, info)
+  return __callFunction(MODULE_NAME_CONFIG, "registerHordeMaster", hmc_id, info)
 end
 
-function queryHordeMaster(hm_id)
+function queryHordeMaster(hmc_id)
   system.print(MODULE_NAME .. "queryHordeMaster")
-  return __callFunction(MODULE_NAME_CONFIG, "queryHordeMaster", hm_id)
+  return __callFunction(MODULE_NAME_CONFIG, "queryHordeMaster", hmc_id)
 end
 
 function queryAllHordeMasters()

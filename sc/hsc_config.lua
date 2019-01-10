@@ -30,11 +30,11 @@ function constructor(metaAddress)
   system.print(MODULE_NAME .. "constructor")
 end
 
-function registerHordeMaster(hm_id, info)
-  system.print(MODULE_NAME .. "registerHordeMaster: hm_id=" .. hm_id .. ", info=" .. json:encode(info))
+function registerHordeMaster(hmc_id, info)
+  system.print(MODULE_NAME .. "registerHordeMaster: hmc_id=" .. hmc_id .. ", info=" .. json:encode(info))
 
   local hm_info = json:decode(info)
-  if hm_info.hm_id ~= hm_id then
+  if hm_info.hmc_id ~= hmc_id then
     system.print(MODULE_NAME .. "registerHordeMaster: ERROR: cannot register Horde with a different ID.")
     -- TODO: need raise default module error
     return
@@ -47,20 +47,20 @@ function registerHordeMaster(hm_id, info)
       for _, container in pairs(cnode.container_list) do
         count = count + 1
         system.print("CNode ID = " .. cnode.cnode_id .. ", Container ID = " .. container.container_id)
-        __callFunction(MODULE_NAME_DB, "insertHordeInfo", hm_id, cnode.cnode_id, container.container_id)
+        __callFunction(MODULE_NAME_DB, "insertHordeInfo", hmc_id, cnode.cnode_id, container.container_id)
       end
     end
 
     -- empty CNode
     if 0 == count then
-      __callFunction(MODULE_NAME_DB, "insertHordeInfo", hm_id, cnode.cnode_id)
+      __callFunction(MODULE_NAME_DB, "insertHordeInfo", hmc_id, cnode.cnode_id)
     end
   end
 end
 
-function queryHordeMaster(hm_id)
-  system.print(MODULE_NAME .. "queryHordeMaster: hm_id=" .. hm_id)
-  return __callFunction(MODULE_NAME_DB, "queryHordeInfo", hm_id)
+function queryHordeMaster(hmc_id)
+  system.print(MODULE_NAME .. "queryHordeMaster: hmc_id=" .. hmc_id)
+  return __callFunction(MODULE_NAME_DB, "queryHordeInfo", hmc_id)
 end
 
 function queryAllHordeMasters()
