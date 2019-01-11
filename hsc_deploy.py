@@ -6,8 +6,6 @@ import json
 import aergo.herapy as herapy
 import time
 
-HSC_VERSION="v0.1.1"
-
 AERGO_TARGET = "testnet.aergo.io:7845"
 AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
 AERGO_WAITING_TIME = 3
@@ -155,11 +153,11 @@ def hsc_deploy(aergo, payload_info):
     try:
         version = query_sc(aergo, hsc_address, "getVersion")
         version = version.decode('utf-8')
-        if HSC_VERSION in version:
+        if payload_info['hsc_version'] in version:
             print("HSC is already deployed (Version: {})".format(version))
             need_to_change_all = False
         else:
-            print("Version is different: (expect) \"{0}\" != (deployed) {1}".format(HSC_VERSION, version))
+            print("Version is different: (expect) \"{0}\" != (deployed){1}".format(payload_info['hsc_version'], version))
             need_to_change_all = True
     except:
         need_to_change_all = True
@@ -213,7 +211,7 @@ def hsc_deploy(aergo, payload_info):
                 payload_info[key]['deployed'] = True
 
     # set HSC version
-    call_sc(aergo, hsc_address, "setVersion", [HSC_VERSION])
+    call_sc(aergo, hsc_address, "setVersion", [payload_info['hsc_version']])
 
     # creating Horde tables
     call_sc(aergo, hsc_address, "createHordeTables")

@@ -4,6 +4,8 @@ import traceback
 import subprocess
 import json
 
+HSC_VERSION="v0.1.2"
+
 HSC_META = 'hsc_meta.lua'
 HSC_DB = 'hsc_db.lua'
 HSC_CMD = 'hsc_cmd.lua'
@@ -163,6 +165,8 @@ def hsc_compile():
 
     print("Compiling Horde Smart Contract (HSC)")
     payload_info = read_payload_info()
+
+    payload_info["hsc_version"] = HSC_VERSION
 
     # at first always check HSC_META
     if check_src_payload(HSC_META, payload_info):
