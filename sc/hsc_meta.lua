@@ -33,7 +33,7 @@ local function __callFunction(module_name, func_name, ...)
   system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name .. ", func_name=" .. func_name)
 
   if __getOwner() ~= system.getSender() then
-    system.print(MODULE_NAME .. "__callFunction: ERROR: might not be authorized sender: " .. system.getSender())
+    system.print(MODULE_NAME .. "__callFunction: WARNING: might not be authorized sender: " .. system.getSender())
     -- TODO: need raise security error
     --return
   end

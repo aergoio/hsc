@@ -11,7 +11,7 @@ AERGO_WAITING_TIME = 3
 aergo = None
 
 HSC_META = 'hsc_meta.lua'
-HSC_ADDRESS = "AmgP1tsDfnjHyYuANcHqC2jJsjcfaXz2ZiqBaHo3FbgnuPcSB6jU"
+HSC_ADDRESS = "AmgJbPveoVC1usCZEXyM9tQ1WsFPx6bixmfbeedBAZM8P2LhQyxh"
 
 DEPLOY_HSC_JSON = 'hsc.payload.dat'
 
@@ -54,31 +54,14 @@ def call_sc(func_name, args=None):
         exit()
 
 
-def query_sc(func_name, args=None):
+def query_sc(func_name, args=None, hsc_address=HSC_ADDRESS):
     # send TX
-    result = aergo.query_sc(HSC_ADDRESS, func_name, args=args)
+    result = aergo.query_sc(hsc_address, func_name, args=args)
     print(result)
     return result
 
 
-def main():
-    if 'AERGO_TARGET' in os.environ:
-        global AERGO_TARGET
-        AERGO_TARGET = os.environ['AERGO_TARGET']
-
-    if 'AERGO_PRIVATE_KEY' in os.environ:
-        global AERGO_PRIVATE_KEY
-        AERGO_PRIVATE_KEY = os.environ['AERGO_PRIVATE_KEY']
-
-    if 'AERGO_WAITING_TIME' in os.environ:
-        global AERGO_WAITING_TIME
-        AERGO_WAITING_TIME = os.environ['AERGO_WAITING_TIME']
-
-    global aergo
-    aergo = herapy.Aergo()
-    aergo.connect(AERGO_TARGET)
-    aergo.new_account(private_key=AERGO_PRIVATE_KEY)
-
+def insert_cmd_create_pond():
     # read deploy json
     if os.path.isfile(DEPLOY_HSC_JSON):
         with open(DEPLOY_HSC_JSON) as f:
@@ -293,6 +276,56 @@ def main():
     print("All Info for '{}' Hordes".format(len(result)))
     print("------------------------")
     print(json.dumps(result, indent=2))
+
+
+def insert_pond():
+    rand_str = str(time.time())
+    pond_id = "pond_id #" + rand_str
+
+    print("Sender =", str(aergo.account.address))
+
+    metadata = {
+        "pond_name": "test pond name: {}".format(rand_str),
+        "field #1": "AAAA",
+    }
+    metadata = json.dumps(metadata)
+    call_sc("insertPond", [pond_id, "cmd_id #1", metadata])
+
+    result = query_sc("queryPonds", [str(aergo.account.address), pond_id])
+    result = json.loads(result)
+    print("\n--------------------------------")
+    print("'{0}' Pond Info:".format(pond_id))
+    print(json.dumps(result, indent=2))
+    print("--------------------------------")
+
+    result = query_sc("queryPonds", [str(aergo.account.address)])
+    result = json.loads(result)
+    print("\n--------------------------------")
+    print("All Ponds:")
+    print(json.dumps(result, indent=2))
+    print("--------------------------------")
+
+
+def main():
+    if 'AERGO_TARGET' in os.environ:
+        global AERGO_TARGET
+        AERGO_TARGET = os.environ['AERGO_TARGET']
+
+    if 'AERGO_PRIVATE_KEY' in os.environ:
+        global AERGO_PRIVATE_KEY
+        AERGO_PRIVATE_KEY = os.environ['AERGO_PRIVATE_KEY']
+
+    if 'AERGO_WAITING_TIME' in os.environ:
+        global AERGO_WAITING_TIME
+        AERGO_WAITING_TIME = os.environ['AERGO_WAITING_TIME']
+
+    global aergo
+    aergo = herapy.Aergo()
+    aergo.connect(AERGO_TARGET)
+    aergo.new_account(private_key=AERGO_PRIVATE_KEY)
+
+    #insert_cmd_create_pond()
+    insert_pond()
 
 
 if __name__ == '__main__':

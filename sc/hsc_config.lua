@@ -46,13 +46,14 @@ function registerHordeMaster(hmc_id, info)
     if cnode.container_list ~= nil then
       for _, container in pairs(cnode.container_list) do
         count = count + 1
-        system.print("CNode ID = " .. cnode.cnode_id .. ", Container ID = " .. container.container_id)
+        system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", Container ID = " .. container.container_id)
         __callFunction(MODULE_NAME_DB, "insertHordeInfo", hmc_id, cnode.cnode_id, container.container_id)
       end
     end
 
     -- empty CNode
     if 0 == count then
+      system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", No Container")
       __callFunction(MODULE_NAME_DB, "insertHordeInfo", hmc_id, cnode.cnode_id)
     end
   end

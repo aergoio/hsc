@@ -83,10 +83,10 @@ function createHordeTables()
 
   -- create Docker container table
   db.exec([[CREATE TABLE IF NOT EXISTS master_conf(
-    hm_id TEXT,
+    hmc_id TEXT,
     cnode_id TEXT,
     container_id TEXT,
-    PRIMARY KEY (hm_id, cnode_id, container_id)
+    PRIMARY KEY (hmc_id, cnode_id, container_id)
   )]])
 end
 
@@ -243,24 +243,24 @@ function queryResult(cmd_id)
   return result_list
 end
 
-function insertHordeInfo(hm_id, cnode_id, container_id)
-  system.print(MODULE_NAME .. "insertHordeInfo: hm_id=" .. hm_id .. ", cnode_id=".. cnode_id)
+function insertHordeInfo(hmc_id, cnode_id, container_id)
+  system.print(MODULE_NAME .. "insertHordeInfo: hmc_id=" .. hmc_id .. ", cnode_id=".. cnode_id)
 
   -- insert Horde info
-  local stmt = db.prepare("INSERT OR REPLACE INTO master_conf(hm_id, cnode_id, container_id) VALUES (?, ?, ?)")
-  stmt:exec(hm_id, cnode_id, container_id)
+  local stmt = db.prepare("INSERT OR REPLACE INTO master_conf(hmc_id, cnode_id, container_id) VALUES (?, ?, ?)")
+  stmt:exec(hmc_id, cnode_id, container_id)
 end
 
-function queryHordeInfo(hm_id)
-  system.print(MODULE_NAME .. "queryHordeInfo: hm_id=" .. hm_id)
+function queryHordeInfo(hmc_id)
+  system.print(MODULE_NAME .. "queryHordeInfo: hmc_id=" .. hmc_id)
 
   local hm_info = {
-    hm_id = hm_id,
+    hmc_id = hmc_id,
     cnode_list = {}
   }
 
-  local stmt = db.prepare("SELECT cnode_id, container_id FROM master_conf WHERE hm_id = ? ORDER BY hm_id, cnode_id")
-  local rs = stmt:query(hm_id)
+  local stmt = db.prepare("SELECT cnode_id, container_id FROM master_conf WHERE hmc_id = ? ORDER BY hmc_id, cnode_id")
+  local rs = stmt:query(hmc_id)
 
   local cnode_id = ""
   local cnode_idx = 0
@@ -296,30 +296,30 @@ function queryAllHordeInfo()
 
   local hm_list = {}
 
-  local stmt = db.prepare("SELECT hm_id, cnode_id, container_id FROM master_conf ORDER BY hm_id, cnode_id")
+  local stmt = db.prepare("SELECT hmc_id, cnode_id, container_id FROM master_conf ORDER BY hmc_id, cnode_id")
   local rs = stmt:query()
 
-  local hm_id = ""
-  local hm_idx = 0
+  local hmc_id = ""
+  local hmc_idx = 0
   local cnode_id = ""
   local cnode_idx = 0
   local container_idx = 1
   while rs:next() do
     local col1, col2, col3 = rs:get()
 
-    -- collect hm_id
-    if col1 ~= hm_id then
-      hm_id = col1
-      hm_idx = hm_idx + 1
-      hm_list[hm_idx] = {
-        hm_id = hm_id,
+    -- collect hmc_id
+    if col1 ~= hmc_id then
+      hmc_id = col1
+      hmc_idx = hmc_idx + 1
+      hm_list[hmc_idx] = {
+        hmc_id = hmc_id,
         cnode_list = {}
       }
       cnode_id = ""
       cnode_idx = 0
     end
 
-    local hm_info = hm_list[hm_idx]
+    local hm_info = hm_list[hmc_idx]
 
     -- collect cnode_id
     if col2 ~= cnode_id then
