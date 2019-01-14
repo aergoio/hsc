@@ -23,7 +23,7 @@ HSC_SRC_LIST = [
     HSC_POND,
 ]
 
-HSC_PAYLOAD_DATA = "./hsc.payload.dat"
+HSC_PAYLOAD_DATA_FILE = "./hsc.payload.dat"
 
 g_aergo_path = ""
 g_aergo_luac_path = ""
@@ -32,7 +32,7 @@ g_aergo_luac_path = ""
 def exit(error=True):
     if error:
         try:
-            os.remove(HSC_PAYLOAD_DATA)
+            os.remove(HSC_PAYLOAD_DATA_FILE)
         except FileNotFoundError:
             pass
         sys.exit(1)
@@ -93,8 +93,8 @@ def check_aergo_luac_path():
 
 def read_payload_info():
     # read previous information
-    if os.path.isfile(HSC_PAYLOAD_DATA):
-        with open(HSC_PAYLOAD_DATA) as f:
+    if os.path.isfile(HSC_PAYLOAD_DATA_FILE):
+        with open(HSC_PAYLOAD_DATA_FILE) as f:
             payload_info = json.load(f)
             f.close()
     else:
@@ -104,7 +104,7 @@ def read_payload_info():
 
 def write_payload_info(payload_info):
     # store deploy json
-    with open(HSC_PAYLOAD_DATA, "w") as f:
+    with open(HSC_PAYLOAD_DATA_FILE, "w") as f:
         f.write(json.dumps(payload_info, indent=2))
         f.close()
 
