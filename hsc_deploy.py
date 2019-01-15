@@ -253,6 +253,7 @@ def main(target, private_key, waiting_time):
         payload_info = read_payload_info()
 
         hsc_address = hsc_deploy(aergo, payload_info)
+        print("Deployed HSC Address: {}".format(hsc_address))
 
         # save payload info.
         write_payload_info(payload_info)

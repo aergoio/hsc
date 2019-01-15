@@ -137,7 +137,6 @@ def check_src_payload(key, payload_info, force=False):
             'src': src,
             'payload': payload,
             'compiled': True,
-            'deployed': False
         }
         return True
 
@@ -146,14 +145,12 @@ def check_src_payload(key, payload_info, force=False):
     if force:
         payload_info[key]['payload'] = payload
         payload_info[key]['compiled'] = True
-        payload_info[key]['deployed'] = False
     else:
         if payload_info[key]['payload'] == payload:
             payload_info[key]['compiled'] = False
         else:
             payload_info[key]['payload'] = payload
             payload_info[key]['compiled'] = True
-            payload_info[key]['deployed'] = False
 
     return payload_info[key]['compiled']
 
