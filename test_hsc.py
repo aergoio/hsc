@@ -179,6 +179,93 @@ def insert_cmd_get_bnode_list(pond_id="pond-01:40PM on January 15, 2019"):
         print(json.dumps(detail, indent=2))
 
 
+def insert_cmd_result_to_multiple_horde():
+    rand_str = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
+    pond_id = "pond-" + rand_str
+    cmd = {
+        "cmd_name": "create_pond",
+        "pond_id": pond_id,
+        "pond_name": "pond-" + rand_str,
+        "bnode_list": [
+            {
+                "bnode_name": "bnode-1-" + rand_str,
+                "hmc_id": "ABC",
+                "cnode_name": "minikube",
+                "config": """
+enabletestmode="True"
+[rpc]
+netserviceaddr="123.456.789.000"
+netserviceport=7777
+"""
+            },
+            {
+                "bnode_name": "bnode-2-" + rand_str,
+                "hmc_id": "DEF",
+                "cnode_name": "minikube",
+                "config": """
+[rpc]
+netserviceport=7779
+"""
+            },
+            {
+                "bnode_name": "bnode-3-" + rand_str,
+                "hmc_id": "GHI",
+                "cnode_name": "minikube",
+                "config": """
+[rpc]
+netserviceport=7779
+"""
+            },
+            {
+                "bnode_name": "bnode-4-" + rand_str,
+                "hmc_id": "ABC",
+                "cnode_name": "minikube2",
+                "config": """
+[rpc]
+netserviceport=7779
+"""
+            },
+            {
+                "bnode_name": "bnode-5-" + rand_str,
+                "hmc_id": "ABC",
+                "cnode_name": "minikube",
+                "config": """
+[rpc]
+netserviceport=7779
+"""
+            },
+        ]
+    }
+    cmd = json.dumps(cmd)
+    cmd_tx = call_sc("insertCommand", [cmd, "ABC", "DEF", "GHI"])
+    cmd_id = str(cmd_tx.tx_hash)
+    print("CMD TX = {}".format(cmd_tx))
+    print("CMD ID = {}".format(cmd_id))
+
+    print("\nQuery Command:")
+    result = query_sc("queryCommand", "ABC")
+    result = json.loads(result)
+    print(json.dumps(result, indent=2))
+    for cmd in result["cmd_list"]:
+        print("CMD ID: {}".format(cmd["cmd_id"]))
+        cmds = json.loads(cmd["cmd"])
+        print(json.dumps(cmds, indent=2))
+
+    time.sleep(10)
+
+    # test: query result
+    print("\nQuery Result:")
+    result = query_sc("queryCommnadResult", cmd_id)
+    result = json.loads(result)
+    print(json.dumps(result, indent=2))
+    for r in result["results"]:
+        print("\nHMC ID: {}".format(r["hmc_id"]))
+        detail = json.loads(r["result"])
+        print(json.dumps(detail, indent=2))
+
+    return pond_id
+
+
 def main():
     if 'AERGO_TARGET' in os.environ:
         global AERGO_TARGET
@@ -200,7 +287,8 @@ def main():
     get_hsc_address()
 
     #insert_cmd_create_pond()
-    insert_cmd_get_bnode_list()
+    #insert_cmd_get_bnode_list()
+    insert_cmd_result_to_multiple_horde()
 
 
 if __name__ == '__main__':

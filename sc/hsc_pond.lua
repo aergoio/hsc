@@ -38,6 +38,21 @@ function constructor(metaAddress)
     PRIMARY KEY (sender, pond_id)
   )]])
 
+  -- create BNode list of Pond table
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS pond_bnode_list(
+    pond_id     TEXT NOT NULL,
+    bnode_id    TEXT NOT NULL,
+    horde_id    TEXT NOT NULL,
+    cnode_id    TEXT NOT NULL,
+    rpc_url     TEXT,
+    p2p_url     TEXT,
+    profile_url TEXT,
+    rest_url    TEXT,
+    create_time INTEGER DEFAULT NULL,
+    start_time  INTEGER DEFAULT NULL,
+    PRIMARY KEY (pond_id, bnode_id)
+  )]])
+
   -- create Pond command history table
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS pond_history_cmd(
     sender TEXT,
@@ -98,8 +113,8 @@ function insertPond(sender, pond_id, cmd_id, metadata)
   if nil ~= metadata then
     -- update metadata history
     __callFunction(MODULE_NAME_DB, "insert",
-      "INSERT INTO pond_history_metadata(sender, pond_id, metadata, timestamp) VALUES (?, ?, ?, ?)",
-      sender, pond_id, metadata, system.getTimestamp())
+                   "INSERT INTO pond_history_metadata(sender, pond_id, metadata, timestamp) VALUES (?, ?, ?, ?)",
+                   sender, pond_id, metadata, system.getTimestamp())
   end
 end
 
@@ -132,4 +147,81 @@ function queryPonds(sender, pond_id)
   return result
 end
 
-abi.register(insertPond, queryPonds)
+function insertBNode(pond_id, bnode_id, horde_id, cnode_id, rpc_url, p2p_url, profile_url, rest_url, create_time)
+  system.print(MODULE_NAME .. "insertBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id .. ", horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", rpc_url=" .. rpc_url .. ", p2p_url=" .. p2p_url .. ", profile_url=" .. profile_url .. ", rest_url=" .. rest_url .. ", create_time=" .. create_time)
+
+  __callFunction(MODULE_NAME_DB, "insert",
+                 [[INSERT INTO pond_bnode_list(
+                      pond_id, 
+                      bnode_id, 
+                      horde_id, 
+                      cnode_id, 
+                      rpc_url, 
+                      p2p_url, 
+                      profile_url, 
+                      rest_url,
+                      create_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)]],
+                 pond_id, bnode_id, horde_id, cnode_id, rpc_url, p2p_url, profile_url, rest_url, create_time)
+end
+
+function updateBNode(pond_id, bnode_id, horde_id, cnode_id, rpc_url, p2p_url, profile_url, rest_url, start_time)
+  system.print(MODULE_NAME .. "insertBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id .. ", horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", rpc_url=" .. rpc_url .. ", p2p_url=" .. p2p_url .. ", profile_url=" .. profile_url .. ", rest_url=" .. rest_url .. ", start_time=" .. start_time)
+
+  __callFunction(MODULE_NAME_DB, "update",
+                 [[UPDATE pond_bnode_list
+                    SET horde_id = ?,
+                      cnode_id = ?,
+                      rpc_url = ?,
+                      p2p_url = ?,
+                      profile_url = ?,
+                      rest_url = ?,
+                      start_time = ?
+                    WHERE pond_id = ? AND bnode_id = ?]],
+                 horde_id, cnode_id, rpc_url, p2p_url, profile_url, rest_url, start_time, pond_id, bnode_id)
+end
+
+function queryBNodeList(pond_id)
+  system.print(MODULE_NAME .. "queryBNodeList: pond_id=" .. pond_id)
+
+  local rows = __callFunction(MODULE_NAME_DB, "select", 
+                              [[SELECT 
+                                    bnode_id,
+                                    horde_id,
+                                    cnode_id,
+                                    rpc_url,
+                                    p2p_url,
+                                    profile_url,
+                                    rest_url,
+                                    create_time,
+                                    start_time
+                                  FROM pond_bnode_list WHERE pond_id = ?]],
+                              pond_id)
+
+  local bnode_list = {}
+
+  for _, v in pairs(rows) do
+    local item = {
+      bnode_id = v[1],
+      horde_id = v[2],
+      cnode_id = v[3],
+      rcp_url = v[4],
+      p2p_url = v[5],
+      profile_url = v[6],
+      rest_url = v[7],
+      create_time = v[8],
+      start_time = v[9],
+    }
+    table.insert(bnode_list, item)
+  end
+
+  system.print("bnode_list=" .. json:encode(bnode_list))
+
+  return {
+    __module = MODULE_NAME,
+    __func_name = "queryBNodeList",
+    bnode_list = bnode_list
+  }
+end
+
+abi.register(insertPond, queryPonds, insertBNode, queryBNodeList)
