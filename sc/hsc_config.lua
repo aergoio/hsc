@@ -33,8 +33,8 @@ function constructor(metaAddress)
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_master(
     horde_id TEXT,
     cnode_id TEXT,
-    container_id TEXT,
-    PRIMARY KEY (horde_id, cnode_id, container_id)
+    bnode_id TEXT,
+    PRIMARY KEY (horde_id, cnode_id, bnode_id)
   )]])
 end
 
@@ -54,22 +54,22 @@ function registerHorde(horde_id, info, clean)
                    horde_id)
   end
 
-  -- one command to multiple HMCs
+  -- one command to multiple Tribes (CNodes)
   for _, cnode in pairs(horde_info.cnode_list) do
     local count = 0
-    if cnode.container_list ~= nil then
-      for _, container in pairs(cnode.container_list) do
+    if cnode.bnode_list ~= nil then
+      for _, bnode in pairs(cnode.bnode_list) do
         count = count + 1
-        system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", Container ID = " .. container.container_id)
+        system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", BNode ID = " .. bnode.bnode_id)
         __callFunction(MODULE_NAME_DB, "insert",
-                       "INSERT OR REPLACE INTO horde_master(horde_id, cnode_id, container_id) VALUES (?, ?, ?)",
-                       horde_id, cnode.cnode_id, container.container_id)
+                       "INSERT OR REPLACE INTO horde_master(horde_id, cnode_id, bnode_id) VALUES (?, ?, ?)",
+                       horde_id, cnode.cnode_id, bnode.bnode_id)
       end
     end
 
     -- empty CNode
     if 0 == count then
-      system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", No Container")
+      system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", No BNodes")
       __callFunction(MODULE_NAME_DB, "insert",
                      "INSERT OR REPLACE INTO horde_master(horde_id, cnode_id) VALUES (?, ?)",
                      horde_id, cnode.cnode_id)
@@ -86,14 +86,14 @@ function queryHorde(horde_id)
   }
 
   local rows = __callFunction(MODULE_NAME_DB, "select",
-                              [[SELECT cnode_id, container_id
+                              [[SELECT cnode_id, bnode_id
                                   FROM horde_master
                                   WHERE horde_id = ?
                                   ORDER BY horde_id, cnode_id]],
                               horde_id)
   local cnode_id = ""
   local cnode_idx = 0
-  local container_idx = 1
+  local bnode_idx = 1
   for _, v in pairs(rows) do
     local col1 = v[1]
     local col2 = v[2]
@@ -104,17 +104,17 @@ function queryHorde(horde_id)
       cnode_idx = cnode_idx + 1
       horde_info.cnode_list[cnode_idx] = {
         cnode_id = cnode_id,
-        container_list = {}
+        bnode_list = {}
       }
-      container_idx = 1
+      bnode_idx = 1
     end
 
-    -- collect container_id
+    -- collect bnode_id
     if col2 ~= nil then
-      horde_info.cnode_list[cnode_idx].container_list[container_idx] = {
-        container_id = col2
+      horde_info.cnode_list[cnode_idx].bnode_list[bnode_idx] = {
+        bnode_id = col2
       }
-      container_idx = container_idx + 1
+      bnode_idx = bnode_idx + 1
     end
   end
 
@@ -131,14 +131,14 @@ function queryAllHordes()
   local horde_list = {}
 
   local rows = __callFunction(MODULE_NAME_DB, "select",
-                              [[SELECT horde_id, cnode_id, container_id
+                              [[SELECT horde_id, cnode_id, bnode_id
                                   FROM horde_master
                                   ORDER BY horde_id, cnode_id]])
   local horde_id = ""
   local horde_idx = 0
   local cnode_id = ""
   local cnode_idx = 0
-  local container_idx = 1
+  local bnode_idx = 1
   for _, v in pairs(rows) do
     local col1 = v[1]
     local col2 = v[2]
@@ -164,17 +164,17 @@ function queryAllHordes()
       cnode_idx = cnode_idx + 1
       horde_info.cnode_list[cnode_idx] = {
         cnode_id = cnode_id,
-        container_list = {}
+        bnode_list = {}
       }
-      container_idx = 1
+      bnode_idx = 1
     end
 
-    -- collect container_id
+    -- collect bnode_id
     if col3 ~= nil then
-      horde_info.cnode_list[cnode_idx].container_list[container_idx] = {
-        container_id = col3
+      horde_info.cnode_list[cnode_idx].bnode_list[bnode_idx] = {
+        bnode_id = col3
       }
-      container_idx = container_idx + 1
+      bnode_idx = bnode_idx + 1
     end
   end
 
