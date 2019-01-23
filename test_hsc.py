@@ -272,8 +272,7 @@ def check_all_cnode_list():
         "hmc_id": horde_id,
         "cnode_list": [
             {
-                "cnode_id": "aaa",
-                "cnode_internal_ip": "xxxxxxx",
+                "id": "aaa",
                 "container_list": [],
             }
         ]
@@ -287,8 +286,10 @@ def check_all_cnode_list():
         "hmc_id": horde_id,
         "cnode_list": [
             {
-                "cnode_id": "abc",
-                "cnode_internal_ip": "xxxxxxx",
+                "id": "abc",
+                "info": {
+                    "cnode_internal_ip": "xxxxxxx",
+                },
                 "container_list": [],
             }
         ]
@@ -300,21 +301,68 @@ def check_all_cnode_list():
     horde_id = "GHI"
     info = {
         "hmc_id": horde_id,
+        "info": {
+            "desc": "horde information description",
+        },
         "cnode_list": [
             {
-                "cnode_id": "ddd",
-                "cnode_internal_ip": "xxxxxxx",
-                "container_list": [],
-            }
+                "id": "ddd",
+                "info": {
+                    "a": "a",
+                    "b": "b",
+                },
+                "container_list": [
+                    {
+                        'id': 'container #1',
+                        'info': {
+                            'type' : 'UNKNOWN',
+                            "desc": 'blah blah blah',
+                        }
+                    }
+                ],
+            },
+            {
+                "id": "eee",
+                "info": {
+                    "d": "d",
+                    "c": "c",
+                },
+                "container_list": [
+                    {
+                        'id': 'container #1',
+                        'info': {
+                            'type' : 'UNKNOWN',
+                            "desc": 'blah blah blah',
+                        }
+                    }
+                ],
+            },
         ]
     }
     info = json.dumps(info)
     info_tx = call_sc("callFunction", ["__HSC_CONFIG__", "registerHorde", horde_id, info])
     print("Info TX = {}".format(info_tx))
 
-
     print("\nQuery Horde Info:")
     result = query_sc("callFunction", ["__HSC_CONFIG__", "queryHorde", "ABC"])
+    result = json.loads(result)
+    print(json.dumps(result, indent=2))
+    horde_info = result['horde_info']
+    print("\nHorde ID: {}".format(horde_info["hmc_id"]))
+    for cnode in horde_info["cnode_list"]:
+        print(json.dumps(cnode, indent=2))
+
+    print("\nQuery Horde Info:")
+    result = query_sc("callFunction", ["__HSC_CONFIG__", "queryHorde", "DEF"])
+    result = json.loads(result)
+    print(json.dumps(result, indent=2))
+    horde_info = result['horde_info']
+    print("\nHorde ID: {}".format(horde_info["hmc_id"]))
+    for cnode in horde_info["cnode_list"]:
+        print(json.dumps(cnode, indent=2))
+
+    print("\nQuery Horde Info:")
+    result = query_sc("callFunction", ["__HSC_CONFIG__", "queryHorde", "GHI"])
     result = json.loads(result)
     print(json.dumps(result, indent=2))
     horde_info = result['horde_info']

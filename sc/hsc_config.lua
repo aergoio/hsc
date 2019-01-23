@@ -31,10 +31,29 @@ function constructor(metaAddress)
 
   -- create Horde master table
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_master(
-    horde_id TEXT,
-    cnode_id TEXT,
-    bnode_id TEXT,
-    PRIMARY KEY (horde_id, cnode_id, bnode_id)
+    horde_id        TEXT PRIMARY KEY,
+    info            TEXT
+  )]])
+
+  -- create Horde CNode metadata table
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_cnodes(
+    horde_id        TEXT,
+    cnode_id        TEXT,
+    info            TEXT,
+    PRIMARY KEY(horde_id, cnode_id),
+    FOREIGN KEY(horde_id) REFERENCES horde_master(horde_id)
+      ON DELETE CASCADE ON UPDATE NO ACTION
+  )]])
+
+  -- create Horde CNode containers metadata table
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_containers(
+    horde_id        TEXT,
+    cnode_id        TEXT,
+    container_id    TEXT,
+    info            TEXT,
+    PRIMARY KEY(horde_id, cnode_id, container_id),
+    FOREIGN KEY(horde_id, cnode_id) REFERENCES horde_cnodes(horde_id, cnode_id)
+      ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 end
 
@@ -49,30 +68,34 @@ function registerHorde(horde_id, info, clean)
   end
 
   if clean then
+    -- delete all information before inserting
     __callFunction(MODULE_NAME_DB, "delete",
                    "DELETE FROM horde_master WHERE horde_id = ?",
                    horde_id)
   end
 
-  -- one command to multiple Tribes (CNodes)
-  for _, cnode in pairs(horde_info.cnode_list) do
-    local count = 0
-    if cnode.bnode_list ~= nil then
-      for _, bnode in pairs(cnode.bnode_list) do
-        count = count + 1
-        system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", BNode ID = " .. bnode.bnode_id)
-        __callFunction(MODULE_NAME_DB, "insert",
-                       "INSERT OR REPLACE INTO horde_master(horde_id, cnode_id, bnode_id) VALUES (?, ?, ?)",
-                       horde_id, cnode.cnode_id, bnode.bnode_id)
-      end
-    end
+  -- insert Horde information
+  __callFunction(MODULE_NAME_DB, "insert",
+                 [[INSERT OR REPLACE INTO horde_master(horde_id, info) VALUES (?, ?)]],
+                 horde_id, json:encode(horde_info.info))
 
-    -- empty CNode
-    if 0 == count then
-      system.print(MODULE_NAME .. "CNode ID = " .. cnode.cnode_id .. ", No BNodes")
-      __callFunction(MODULE_NAME_DB, "insert",
-                     "INSERT OR REPLACE INTO horde_master(horde_id, cnode_id) VALUES (?, ?)",
-                     horde_id, cnode.cnode_id)
+  -- one command to multiple CNodes
+  for _, cnode in pairs(horde_info.cnode_list) do
+    -- insert CNode info
+    system.print(MODULE_NAME .. "CNode ID = " .. cnode.id .. ", No BNodes")
+    __callFunction(MODULE_NAME_DB, "insert",
+                   [[INSERT OR REPLACE INTO horde_cnodes(horde_id, cnode_id, info) VALUES (?, ?, ?)]],
+                   horde_id, cnode.id, json:encode(cnode.info))
+
+    if cnode.container_list ~= nil then
+      for _, container in pairs(cnode.container_list) do
+        system.print(MODULE_NAME .. "CNode ID = " .. cnode.id .. ", Container ID = " .. container.id)
+        __callFunction(MODULE_NAME_DB, "insert",
+                       [[INSERT OR REPLACE INTO horde_containers
+                            (horde_id, cnode_id, container_id, info)
+                          VALUES (?, ?, ?, ?)]],
+                       horde_id, cnode.id, container.id, json:encode(container.info))
+      end
     end
   end
 end
@@ -82,40 +105,54 @@ function queryHorde(horde_id)
 
   local horde_info = {
     hmc_id = horde_id,
+    info = {},
     cnode_list = {}
   }
 
+  -- get horde info
   local rows = __callFunction(MODULE_NAME_DB, "select",
-                              [[SELECT cnode_id, bnode_id
-                                  FROM horde_master
-                                  WHERE horde_id = ?
-                                  ORDER BY horde_id, cnode_id]],
+                              [[SELECT info FROM horde_master WHERE horde_id = ?]],
                               horde_id)
-  local cnode_id = ""
-  local cnode_idx = 0
-  local bnode_idx = 1
   for _, v in pairs(rows) do
-    local col1 = v[1]
-    local col2 = v[2]
+    horde_info.info = json:decode(v[1])
+  end
 
-    -- collect cnode_id
-    if col1 ~= cnode_id then
-      cnode_id = col1
-      cnode_idx = cnode_idx + 1
-      horde_info.cnode_list[cnode_idx] = {
-        cnode_id = cnode_id,
-        bnode_list = {}
-      }
-      bnode_idx = 1
+  -- get cnode info
+  rows = __callFunction(MODULE_NAME_DB, "select",
+                        [[SELECT cnode_id, info FROM horde_cnodes WHERE horde_id = ?]],
+                        horde_id)
+  for _, v in pairs(rows) do
+    table.insert(horde_info.cnode_list, {
+      id = v[1],
+      info = json:decode(v[2]),
+      container_list = {}
+    })
+  end
+
+  -- get container info
+  rows = __callFunction(MODULE_NAME_DB, "select",
+                        [[SELECT cnode_id, container_id, info FROM horde_containers
+                            WHERE horde_id = ? ORDER BY cnode_id]],
+                        horde_id)
+  local cnode = {}
+  for _, v in pairs(rows) do
+    local cnode_id = v[1]
+    local container_id = v[2]
+    local container_info = json:decode(v[3])
+
+    if cnode.id ~= cnode_id then
+      for _, v2 in pairs(horde_info.cnode_list) do
+        if cnode_id == v2.id then
+          cnode = v2
+          break
+        end
+      end
     end
 
-    -- collect bnode_id
-    if col2 ~= nil then
-      horde_info.cnode_list[cnode_idx].bnode_list[bnode_idx] = {
-        bnode_id = col2
-      }
-      bnode_idx = bnode_idx + 1
-    end
+    table.insert(cnode.container_list, {
+      id = container_id,
+      info = container_info,
+    })
   end
 
   return {
@@ -130,52 +167,82 @@ function queryAllHordes()
 
   local horde_list = {}
 
+  -- get horde info
   local rows = __callFunction(MODULE_NAME_DB, "select",
-                              [[SELECT horde_id, cnode_id, bnode_id
-                                  FROM horde_master
-                                  ORDER BY horde_id, cnode_id]])
-  local horde_id = ""
-  local horde_idx = 0
-  local cnode_id = ""
-  local cnode_idx = 0
-  local bnode_idx = 1
+                              [[SELECT horde_id, info FROM horde_master]])
   for _, v in pairs(rows) do
-    local col1 = v[1]
-    local col2 = v[2]
-    local col3 = v[3]
+    system.print("horde_id=" .. v[1] .. ", horde_info=" .. v[2])
 
-    -- collect horde_id
-    if col1 ~= horde_id then
-      horde_id = col1
-      horde_idx = horde_idx + 1
-      horde_list[horde_idx] = {
-        hmc_id = horde_id,
-        cnode_list = {}
-      }
-      cnode_id = ""
-      cnode_idx = 0
+    table.insert(horde_list, {
+      hmc_id = v[1],
+      info = json:decode(v[2]),
+      cnode_list = {}
+    })
+  end
+
+  -- get cnode info
+  rows = __callFunction(MODULE_NAME_DB, "select",
+                        [[SELECT horde_id, cnode_id, info FROM horde_cnodes ORDER BY horde_id]])
+  local horde = {}
+  for _, v in pairs(rows) do
+    local horde_id = v[1]
+    local cnode_id = v[2]
+    local cnode_info = json:decode(v[3])
+
+    system.print("horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", cnode_info=" .. v[3])
+
+    if horde.id ~= horde_id then
+      for _, v2 in pairs(horde_list) do
+        if horde_id == v2.hmc_id then
+          horde = v2
+          break
+        end
+      end
     end
 
-    local horde_info = horde_list[horde_idx]
+    table.insert(horde.cnode_list, {
+      id = cnode_id,
+      info = cnode_info,
+      container_list = {}
+    })
+  end
 
-    -- collect cnode_id
-    if col2 ~= cnode_id then
-      cnode_id = col2
-      cnode_idx = cnode_idx + 1
-      horde_info.cnode_list[cnode_idx] = {
-        cnode_id = cnode_id,
-        bnode_list = {}
-      }
-      bnode_idx = 1
+  -- get container info
+  rows = __callFunction(MODULE_NAME_DB, "select",
+                        [[SELECT horde_id, cnode_id, container_id, info FROM horde_containers
+                            ORDER BY horde_id, cnode_id]])
+  local horde = {}
+  local cnode = {}
+  for _, v in pairs(rows) do
+    local horde_id = v[1]
+    local cnode_id = v[2]
+    local container_id = v[3]
+    local container_info = json:decode(v[4])
+
+    system.print("horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", container_id=" .. container_id .. ", container_info=" .. v[3])
+
+    if horde.id ~= horde_id then
+      for _, v2 in pairs(horde_list) do
+        if horde_id == v2.hmc_id then
+          horde = v2
+          break
+        end
+      end
     end
 
-    -- collect bnode_id
-    if col3 ~= nil then
-      horde_info.cnode_list[cnode_idx].bnode_list[bnode_idx] = {
-        bnode_id = col3
-      }
-      bnode_idx = bnode_idx + 1
+    if cnode.id ~= cnode_id then
+      for _, v2 in pairs(horde.cnode_list) do
+        if cnode_id == v2.id then
+          cnode = v2
+          break
+        end
+      end
     end
+
+    table.insert(cnode.container_list, {
+      id = container_id,
+      info = container_info
+    })
   end
 
   return {
