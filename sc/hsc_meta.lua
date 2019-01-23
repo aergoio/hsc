@@ -16,7 +16,7 @@ local function __init__()
   system.print(MODULE_NAME .. "__init__: sc_address=" .. scAddress)
 
   db.exec([[CREATE TABLE IF NOT EXISTS modules(
-    name TEXT PRIMARY KEY,
+    name    TEXT PRIMARY KEY,
     address TEXT NOT NULL
   )]])
   local stmt = db.prepare("INSERT INTO modules(name, address) VALUES (?, ?)")
@@ -25,14 +25,14 @@ local function __init__()
   system.setItem(MODULE_NAME .. "__CREATOR__", system.getSender())
 end
 
-local function __getOwner()
+local function __getModuleOwner()
   return system.getItem(MODULE_NAME .. "__CREATOR__")
 end
 
 local function __callFunction(module_name, func_name, ...)
   system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name .. ", func_name=" .. func_name)
 
-  if __getOwner() ~= system.getSender() then
+  if __getModuleOwner() ~= system.getSender() then
     system.print(MODULE_NAME .. "__callFunction: WARNING: might not be authorized sender: " .. system.getSender())
     -- TODO: need raise security error
     --return
@@ -55,31 +55,21 @@ local function __getModuleAddress(name)
   return address
 end
 
-function __init_module__(module_name, address)
+function __init_module__(module_name, address, ...)
   if MODULE_NAME == module_name then
     system.print(MODULE_NAME .. "__init_module__: ERROR: cannot initialize META module.")
-    -- TODO: need raise default module error
-    return
-  elseif MODULE_NAME_MAIN == module_name
-          or MODULE_NAME_DB == module_name
-          or MODULE_NAME_CMD == module_name
-          or MODULE_NAME_RESULT == module_name
-          or MODULE_NAME_CONFIG == module_name
-          or MODULE_NAME_POND == module_name
-  then
-    system.print(MODULE_NAME .. "__init_module__: initialize module:" .. module_name .. ", address=" .. address)
-  else
-    system.print(MODULE_NAME .. "__init_module__: ERROR: cannot recognize module:" .. module_name)
-    -- TODO: need raise user specific error
     return
   end
 
+  system.print(MODULE_NAME .. "__init_module__: initialize module:" .. module_name .. ", address=" .. address)
+
+  -- insert module name and address
   local stmt = db.prepare("INSERT OR REPLACE INTO modules(name, address) VALUES (?, ?)")
   stmt:exec(module_name, address)
 end
 
 function __call_module_function__(module_name, func_name, ...)
-  system.print(MODULE_NAME .. "__call_module_function__: module_name=" .. module_name)
+  system.print(MODULE_NAME .. "__call_module_function__: module_name=" .. module_name .. ", func_name=" .. func_name)
 
   local address = __getModuleAddress(module_name)
 
@@ -96,6 +86,11 @@ abi.register(__init_module__, __call_module_function__)
 function constructor()
   __init__()
   system.print(MODULE_NAME .. "constructor")
+end
+
+function callFunction(module, functionName, ...)
+  system.print(MODULE_NAME .. "callFunction: module=" .. module .. ", functionName=" .. functionName)
+  return __callFunction(module, functionName, ...)
 end
 
 function setVersion(version)
@@ -158,8 +153,23 @@ function queryPonds(...)
   return __callFunction(MODULE_NAME_POND, "queryPonds", ...)
 end
 
+function insertBNode(...)
+  system.print(MODULE_NAME .. "insertBNode")
+  return __callFunction(MODULE_NAME_POND, "insertBNode", ...)
+end
+
+function updateBNode(...)
+  system.print(MODULE_NAME .. "updateBNode")
+  return __callFunction(MODULE_NAME_POND, "updateBNode", ...)
+end
+
+function queryBNodeList(...)
+  system.print(MODULE_NAME .. "queryBNodeList")
+  return __callFunction(MODULE_NAME_POND, "queryBNodeList", ...)
+end
+
 -- exposed functions
-abi.register(setVersion, getVersion,
+abi.register(setVersion, getVersion, callFunction,
   -- DB
   createHordeTables,
   -- CMD
@@ -169,6 +179,7 @@ abi.register(setVersion, getVersion,
   -- CONFIG
   registerHordeMaster, queryHordeMaster, queryAllHordeMasters,
   -- POND
-  insertPond, queryPonds
+  insertPond, queryPonds,
+  -- BNode
+  insertBNode, updateBNode, queryBNodeList
 )
-

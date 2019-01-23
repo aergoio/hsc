@@ -213,9 +213,6 @@ def hsc_deploy(aergo, payload_info):
     # set HSC version
     call_sc(aergo, hsc_address, "setVersion", [payload_info['hsc_version']])
 
-    # creating Horde tables
-    call_sc(aergo, hsc_address, "createHordeTables")
-
     print()
     print("Horde Smart Contract Address =", hsc_address)
 

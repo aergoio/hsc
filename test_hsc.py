@@ -266,6 +266,73 @@ netserviceport=7779
     return pond_id
 
 
+def check_all_cnode_list():
+    horde_id = "ABC"
+    info = {
+        "hmc_id": horde_id,
+        "cnode_list": [
+            {
+                "cnode_id": "aaa",
+                "cnode_internal_ip": "xxxxxxx",
+                "container_list": [],
+            }
+        ]
+    }
+    info = json.dumps(info)
+    info_tx = call_sc("callFunction", ["__HSC_CONFIG__", "registerHorde", horde_id, info])
+    print("Info TX = {}".format(info_tx))
+
+    horde_id = "DEF"
+    info = {
+        "hmc_id": horde_id,
+        "cnode_list": [
+            {
+                "cnode_id": "abc",
+                "cnode_internal_ip": "xxxxxxx",
+                "container_list": [],
+            }
+        ]
+    }
+    info = json.dumps(info)
+    info_tx = call_sc("callFunction", ["__HSC_CONFIG__", "registerHorde", horde_id, info, True])
+    print("Info TX = {}".format(info_tx))
+
+    horde_id = "GHI"
+    info = {
+        "hmc_id": horde_id,
+        "cnode_list": [
+            {
+                "cnode_id": "ddd",
+                "cnode_internal_ip": "xxxxxxx",
+                "container_list": [],
+            }
+        ]
+    }
+    info = json.dumps(info)
+    info_tx = call_sc("callFunction", ["__HSC_CONFIG__", "registerHorde", horde_id, info])
+    print("Info TX = {}".format(info_tx))
+
+
+    print("\nQuery Horde Info:")
+    result = query_sc("callFunction", ["__HSC_CONFIG__", "queryHorde", "ABC"])
+    result = json.loads(result)
+    print(json.dumps(result, indent=2))
+    horde_info = result['horde_info']
+    print("\nHorde ID: {}".format(horde_info["hmc_id"]))
+    for cnode in horde_info["cnode_list"]:
+        print(json.dumps(cnode, indent=2))
+
+    print("\nQuery All Horde Info:")
+    result = query_sc("callFunction", ["__HSC_CONFIG__", "queryAllHordes"])
+    result = json.loads(result)
+    print(json.dumps(result, indent=2))
+    horde_list = result['horde_list']
+    for i, horde_info in enumerate(horde_list):
+        print("\n[{0}] Horde ID: {1}".format(i, horde_info["hmc_id"]))
+        for cnode in horde_info["cnode_list"]:
+            print(json.dumps(cnode, indent=2))
+
+
 def main():
     if 'AERGO_TARGET' in os.environ:
         global AERGO_TARGET
@@ -286,9 +353,10 @@ def main():
 
     get_hsc_address()
 
+    check_all_cnode_list()
     #insert_cmd_create_pond()
     #insert_cmd_get_bnode_list()
-    insert_cmd_result_to_multiple_horde()
+    #insert_cmd_result_to_multiple_horde()
 
 
 if __name__ == '__main__':
