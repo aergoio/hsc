@@ -267,6 +267,7 @@ netserviceport=7779
 
 
 def check_all_cnode_list():
+    """
     horde_id = "ABC"
     info = {
         "hmc_id": horde_id,
@@ -369,6 +370,7 @@ def check_all_cnode_list():
     print("\nHorde ID: {}".format(horde_info["hmc_id"]))
     for cnode in horde_info["cnode_list"]:
         print(json.dumps(cnode, indent=2))
+    """
 
     print("\nQuery All Horde Info:")
     result = query_sc("callFunction", ["__HSC_CONFIG__", "queryAllHordes"])
