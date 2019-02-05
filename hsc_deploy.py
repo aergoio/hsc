@@ -52,10 +52,10 @@ def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 
-def read_payload_info():
+def read_payload_info(payload_path):
     # read previous information
-    if os.path.isfile(HSC_PAYLOAD_DATA):
-        with open(HSC_PAYLOAD_DATA) as f:
+    if os.path.isfile(payload_path):
+        with open(payload_path) as f:
             payload_info = json.load(f)
             f.close()
     else:
@@ -63,9 +63,9 @@ def read_payload_info():
     return payload_info
 
 
-def write_payload_info(payload_info):
+def write_payload_info(payload_info, payload_path):
     # store deploy json
-    with open(HSC_PAYLOAD_DATA, "w") as f:
+    with open(payload_path, "w") as f:
         f.write(json.dumps(payload_info, indent=2))
         f.close()
 
@@ -141,8 +141,11 @@ def try_to_deploy(aergo, key, payload_info, args=None, force=False):
     return True
 
 
-def hsc_deploy(aergo, payload_info):
+def hsc_deploy(aergo, payload_path):
     print("Deploying Horde Smart Contract (HSC)")
+
+    # read payload info.
+    payload_info = read_payload_info(payload_path=payload_path)
 
     if payload_info is None or 'hsc_address' not in payload_info:
         hsc_address = None
@@ -218,6 +221,9 @@ def hsc_deploy(aergo, payload_info):
 
     payload_info['hsc_address'] = hsc_address
 
+    # save payload info.
+    write_payload_info(payload_info=payload_info, payload_path=payload_path)
+
     print("Prepared Horde Smart Contract")
     return hsc_address
 
@@ -246,14 +252,8 @@ def main(target, private_key, waiting_time):
             print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
             exit()
 
-        # read payload info.
-        payload_info = read_payload_info()
-
-        hsc_address = hsc_deploy(aergo, payload_info)
+        hsc_address = hsc_deploy(aergo=aergo, payload_path=HSC_PAYLOAD_DATA)
         print("Deployed HSC Address: {}".format(hsc_address))
-
-        # save payload info.
-        write_payload_info(payload_info)
 
         exit(False)
     except Exception:
