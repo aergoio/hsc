@@ -14,7 +14,7 @@ aergo = None
 HSC_META = 'hsc_meta.lua'
 HSC_ADDRESS = "AmgUPYeR2w8Hrh4pauwDRzykGUjvRTNEoH65S6xXawoy3CAZrEda"
 
-DEPLOY_HSC_JSON = 'hsc.payload.dat'
+DEPLOY_HSC_JSON = 'hsc.deployed.payload.dat'
 
 
 def exit(error=True):

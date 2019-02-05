@@ -44,3 +44,5 @@ luac.out
 
 # python
 __pycache__
+
+hsc.deployed.payload.dat

@@ -23,7 +23,7 @@ HSC_SRC_LIST = [
     HSC_POND,
 ]
 
-HSC_PAYLOAD_DATA_FILE = "./hsc.payload.dat"
+HSC_COMPILED_PAYLOAD_DATA_FILE = "./hsc.compiled.payload.dat"
 
 g_aergo_path = ""
 g_aergo_luac_path = ""
@@ -32,7 +32,7 @@ g_aergo_luac_path = ""
 def exit(error=True):
     if error:
         try:
-            os.remove(HSC_PAYLOAD_DATA_FILE)
+            os.remove(HSC_COMPILED_PAYLOAD_DATA_FILE)
         except FileNotFoundError:
             pass
         sys.exit(1)
@@ -93,8 +93,8 @@ def check_aergo_luac_path():
 
 def read_payload_info():
     # read previous information
-    if os.path.isfile(HSC_PAYLOAD_DATA_FILE):
-        with open(HSC_PAYLOAD_DATA_FILE) as f:
+    if os.path.isfile(HSC_COMPILED_PAYLOAD_DATA_FILE):
+        with open(HSC_COMPILED_PAYLOAD_DATA_FILE) as f:
             payload_info = json.load(f)
             f.close()
     else:
@@ -104,7 +104,7 @@ def read_payload_info():
 
 def write_payload_info(payload_info):
     # store deploy json
-    with open(HSC_PAYLOAD_DATA_FILE, "w") as f:
+    with open(HSC_COMPILED_PAYLOAD_DATA_FILE, "w") as f:
         f.write(json.dumps(payload_info, indent=2))
         f.close()
 
@@ -123,12 +123,12 @@ def compile_src(src):
     return out.decode('utf-8').strip()
 
 
-def check_src_payload(key, payload_info, force=False):
+def check_src_payload(key, payload_info):
     src = os.path.join(HSC_SRC_DIR, key)
     src = os.path.abspath(src)
     if not os.path.isfile(src):
         eprint("ERROR: Cannot find the source file: {}".format(src))
-        return True
+        exit()
 
     payload = compile_src(src)
 
@@ -136,23 +136,17 @@ def check_src_payload(key, payload_info, force=False):
         payload_info[key] = {
             'src': src,
             'payload': payload,
-            'compiled': True,
         }
         return True
-
-    payload_info[key]['src'] = src
-
-    if force:
-        payload_info[key]['payload'] = payload
-        payload_info[key]['compiled'] = True
     else:
-        if payload_info[key]['payload'] == payload:
-            payload_info[key]['compiled'] = False
-        else:
-            payload_info[key]['payload'] = payload
-            payload_info[key]['compiled'] = True
+        if payload_info[key]['payload'] != payload:
+            payload_info[key] = {
+                'src': src,
+                'payload': payload,
+            }
+            return True
 
-    return payload_info[key]['compiled']
+    return False
 
 
 def hsc_compile():
@@ -167,10 +161,8 @@ def hsc_compile():
 
     # at first always check HSC_META
     if check_src_payload(HSC_META, payload_info):
-        need_to_change_all = True
         print("  > compiled ...", HSC_META)
     else:
-        need_to_change_all = False
         print("  > ............", HSC_META)
 
     # check other sources
@@ -178,7 +170,7 @@ def hsc_compile():
         if key == HSC_META:
             continue
 
-        if check_src_payload(key, payload_info, need_to_change_all):
+        if check_src_payload(key, payload_info):
             if key not in payload_info:
                 print("  > ERROR ......", key)
                 continue

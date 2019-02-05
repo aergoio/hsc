@@ -6,7 +6,7 @@ import json
 import aergo.herapy as herapy
 import time
 
-AERGO_TARGET = "testnet.aergo.io:7845"
+AERGO_TARGET = "localhost:7845"
 AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
 AERGO_WAITING_TIME = 3
 
@@ -32,7 +32,8 @@ HSC_SRC_LIST = [
     HSC_POND,
 ]
 
-HSC_PAYLOAD_DATA = "./hsc.payload.dat"
+HSC_COMPILED_PAYLOAD_DATA_FILE = "./hsc.compiled.payload.dat"
+HSC_DEPLOYED_PAYLOAD_DATA_FILE = "./hsc.deployed.payload.dat"
 
 
 def exit(error=True):
@@ -127,102 +128,106 @@ def query_sc(aergo, hsc_address, func_name, args=None):
     return result
 
 
-def try_to_deploy(aergo, key, payload_info, args=None, force=False):
-    if key not in payload_info:
-        return False
+def try_to_deploy(aergo, key, payload, deployed_info, args=None, force=False):
+    if key not in deployed_info:
+        deployed_info[key] = {}
 
-    if not force:
-        if payload_info[key]['deployed'] and not payload_info[key]['compiled']:
+    if 'payload' in deployed_info[key] and not force:
+        if payload == deployed_info[key]['payload']:
+            # don't need to deploy
             return False
 
-    address = deploy_sc(aergo, payload_info[key]['payload'], args)
-    payload_info[key]['address'] = address
+    address = deploy_sc(aergo, payload, args)
+    deployed_info[key]['address'] = address
+
+    deployed_info[key]['payload'] = payload
 
     return True
 
 
-def hsc_deploy(aergo, payload_path):
+def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
     print("Deploying Horde Smart Contract (HSC)")
 
-    # read payload info.
-    payload_info = read_payload_info(payload_path=payload_path)
+    # read compiled payload info.
+    compiled_info = read_payload_info(compiled_payload_file_path)
 
-    if payload_info is None or 'hsc_address' not in payload_info:
-        hsc_address = None
-    else:
-        hsc_address = payload_info['hsc_address']
+    # read deployed payload info.
+    deployed_info = read_payload_info(deployed_payload_file_path)
 
     # at first check whether HSC is deployed or not
     try:
-        version = query_sc(aergo, hsc_address, "getVersion")
-        version = version.decode('utf-8')
-        if payload_info['hsc_version'] in version:
-            print("HSC is already deployed (Version: {})".format(version))
-            need_to_change_all = False
-        else:
-            print("Version is different: (expect) \"{0}\" != (deployed){1}".format(payload_info['hsc_version'], version))
+        if compiled_info['hsc_version'] != deployed_info['hsc_version']:
             need_to_change_all = True
+        else:
+            hsc_address = deployed_info['hsc_address']
+
+            # read the version of deployed HSC
+            version = query_sc(aergo, hsc_address, "getVersion")
+            version = version.decode('utf-8')
+
+            if compiled_info['hsc_version'] in version:
+                print("HSC is already deployed (Version: {})".format(version))
+                need_to_change_all = False
+            else:
+                print("Version is different: (expect) \"{0}\" != (deployed) {1}".format(compiled_info['hsc_version'],
+                                                                                        version))
+                need_to_change_all = True
     except:
         need_to_change_all = True
 
+    deployed_info['hsc_version'] = compiled_info['hsc_version']
+
     # always check HSC_META
-    if need_to_change_all:
-        try_to_deploy(aergo, HSC_META, payload_info, force=need_to_change_all)
+    if try_to_deploy(aergo=aergo, key=HSC_META,
+                     payload=compiled_info[HSC_META]['payload'],
+                     deployed_info=deployed_info,
+                     force=need_to_change_all):
+        need_to_change_all = True
         print("  > deployed ...", HSC_META)
     else:
-        if try_to_deploy(aergo, HSC_META, payload_info):
-            need_to_change_all = True
-            print("  > deployed ...", HSC_META)
-        else:
-            need_to_change_all = False
-            print("  > ............", HSC_META)
-    payload_info[HSC_META]['compiled'] = False
-    payload_info[HSC_META]['deployed'] = True
+        need_to_change_all = False
+        print("  > ............", HSC_META)
 
-    hsc_address = payload_info[HSC_META]['address']
+    hsc_address = deployed_info[HSC_META]['address']
 
     # always check HSC_DB
-    if need_to_change_all:
-        try_to_deploy(aergo, HSC_DB, payload_info, hsc_address, force=need_to_change_all)
+    if try_to_deploy(aergo=aergo, key=HSC_DB,
+                     payload=compiled_info[HSC_DB]['payload'],
+                     deployed_info=deployed_info,
+                     args=hsc_address,
+                     force=need_to_change_all):
+        need_to_change_all = True
         print("  > deployed ...", HSC_DB)
     else:
-        if try_to_deploy(aergo, HSC_DB, payload_info, hsc_address):
-            need_to_change_all = True
-            print("  > deployed ...", HSC_DB)
-        else:
-            need_to_change_all = False
-            print("  > ............", HSC_DB)
-    payload_info[HSC_DB]['compiled'] = False
-    payload_info[HSC_DB]['deployed'] = True
+        need_to_change_all = False
+        print("  > ............", HSC_DB)
 
     # check other sources
     for key in HSC_SRC_LIST:
         if key == HSC_META or key == HSC_DB:
             continue
 
-        if try_to_deploy(aergo, key, payload_info, hsc_address, force=need_to_change_all):
+        if try_to_deploy(aergo=aergo, key=key,
+                         payload=compiled_info[key]['payload'],
+                         deployed_info=deployed_info,
+                         args=hsc_address,
+                         force=need_to_change_all):
+            need_to_change_all = True
             print("  > deployed ...", key)
-            payload_info[key]['compiled'] = False
-            payload_info[key]['deployed'] = True
         else:
-            if key not in payload_info:
-                print("  > ERROR ......", key)
-                continue
-            else:
-                print("  > ............", key)
-                payload_info[key]['compiled'] = False
-                payload_info[key]['deployed'] = True
+            need_to_change_all = False
+            print("  > ............", key)
 
     # set HSC version
-    call_sc(aergo, hsc_address, "setVersion", [payload_info['hsc_version']])
+    call_sc(aergo, hsc_address, "setVersion", [deployed_info['hsc_version']])
 
     print()
     print("Horde Smart Contract Address =", hsc_address)
 
-    payload_info['hsc_address'] = hsc_address
+    deployed_info['hsc_address'] = hsc_address
 
     # save payload info.
-    write_payload_info(payload_info=payload_info, payload_path=payload_path)
+    write_payload_info(payload_info=deployed_info, payload_path=deployed_payload_file_path)
 
     print("Prepared Horde Smart Contract")
     return hsc_address
@@ -252,7 +257,9 @@ def main(target, private_key, waiting_time):
             print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
             exit()
 
-        hsc_address = hsc_deploy(aergo=aergo, payload_path=HSC_PAYLOAD_DATA)
+        hsc_address = hsc_deploy(aergo=aergo,
+                                 compiled_payload_file_path=HSC_COMPILED_PAYLOAD_DATA_FILE,
+                                 deployed_payload_file_path=HSC_DEPLOYED_PAYLOAD_DATA_FILE)
         print("Deployed HSC Address: {}".format(hsc_address))
 
         exit(False)
