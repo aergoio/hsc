@@ -6,27 +6,25 @@ import json
 
 HSC_VERSION="v0.1.2"
 
-HSC_META = 'hsc_meta.lua'
-HSC_DB = 'hsc_db.lua'
-HSC_CMD = 'hsc_cmd.lua'
-HSC_RESULT = 'hsc_result.lua'
-HSC_CONFIG = 'hsc_config.lua'
-HSC_POND = 'hsc_pond.lua'
-
-HSC_SRC_DIR = "./sc/"
-HSC_SRC_LIST = [
-    HSC_META,
-    HSC_DB,
-    HSC_CMD,
-    HSC_RESULT,
-    HSC_CONFIG,
-    HSC_POND,
-]
+_MANIFEST = '_manifest.lua'
+_MANIFEST_DB = '_manifest_db.lua'
 
 HSC_COMPILED_PAYLOAD_DATA_FILE = "./hsc.compiled.payload.dat"
 
 g_aergo_path = ""
 g_aergo_luac_path = ""
+
+QUIET_MODE = False
+
+
+def out_print(*args, **kwargs):
+    if not QUIET_MODE:
+        print(*args, **kwargs)
+
+
+def err_print(*args, **kwargs):
+    if not QUIET_MODE:
+        print(*args, file=sys.stderr, **kwargs)
 
 
 def exit(error=True):
@@ -40,24 +38,29 @@ def exit(error=True):
     sys.exit(0)
 
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+def get_all_lua_files(dir, files):
+    for dirpath, dirnames, filenames in os.walk(dir):
+        for fn in filenames:
+            file_name, file_ext = os.path.splitext(fn)
+            if file_ext == '.lua':
+                files[fn] = os.path.join(dirpath, fn)
+        for dn in dirnames:
+            get_all_lua_files(os.path.join(dirpath, dn), files)
 
 
 def check_aergo_path():
     global g_aergo_path
 
-    print("Searching AERGO Path ...")
+    out_print("Searching AERGO Path ...")
 
     if 'AERGO_PATH' in os.environ:
         g_aergo_path = str(os.environ['AERGO_PATH'])
     elif 'GOPATH' in os.environ:
         g_aergo_path = (os.environ['GOPATH'])
     else:
-        eprint("ERROR: Cannot find AERGO_PATH")
-        exit()
+        raise FileNotFoundError("Cannot find AERGO_PATH")
 
-    print("  > AERGO_PATH: ", g_aergo_path)
+    out_print("  > AERGO_PATH: ", g_aergo_path)
 
 
 def search_file(dir):
@@ -81,14 +84,12 @@ def check_aergo_luac_path():
     try:
         search_file(g_aergo_path)
     except FileNotFoundError:
-        eprint("ERROR: Cannot find AERGO_PATH for finding AERGO Lua Compiler (aergoluac)")
-        exit()
+        raise FileNotFoundError("Cannot find AERGO_PATH for finding AERGO Lua Compiler (aergoluac)")
 
     if g_aergo_luac_path is None or 0 == len(g_aergo_luac_path):
-        eprint("ERROR: Cannot find AERGO Lua Compiler (aergoluac)")
-        exit()
+        raise FileNotFoundError("Cannot find AERGO Lua Compiler (aergoluac)")
 
-    print("  > 'aergoluac': ", g_aergo_luac_path)
+    out_print("  > 'aergoluac': ", g_aergo_luac_path)
 
 
 def read_payload_info():
@@ -116,26 +117,21 @@ def compile_src(src):
                                stderr=subprocess.PIPE)
     out, err = process.communicate()
     if err is not None and len(err) != 0:
-        eprint("ERROR: Fail to run 'aergoluac': {}".format(err))
-        exit()
+        raise SyntaxError("Fail to run 'aergoluac': {}".format(err))
 
     # get payload
     return out.decode('utf-8').strip()
 
 
-def check_src_payload(key, payload_info):
-    src = os.path.join(HSC_SRC_DIR, key)
-    src = os.path.abspath(src)
-    if not os.path.isfile(src):
-        eprint("ERROR: Cannot find the source file: {}".format(src))
-        exit()
-
+def check_src_payload(key, path, payload_info, is_manifest=False):
+    src = os.path.abspath(path)
     payload = compile_src(src)
 
     if key not in payload_info:
         payload_info[key] = {
             'src': src,
             'payload': payload,
+            'is_manifest': is_manifest,
         }
         return True
     else:
@@ -143,6 +139,7 @@ def check_src_payload(key, payload_info):
             payload_info[key] = {
                 'src': src,
                 'payload': payload,
+                'is_manifest': is_manifest,
             }
             return True
 
@@ -150,43 +147,78 @@ def check_src_payload(key, payload_info):
 
 
 def hsc_compile():
+    # check Aergo environment
     check_aergo_path()
     check_aergo_luac_path()
-    print()
+    out_print()
 
-    print("Compiling Horde Smart Contract (HSC)")
+    # check lua files
+    lua_dir = os.getenv('HSC_LUA_DIR', './sc')
+    lua_files = {}
+    get_all_lua_files(lua_dir, lua_files)
+
+    found_manifest = False
+    found_manifest_db = False
+
+    hsc_src_list = {}
+    for fn, fp in lua_files.items():
+        if fn == _MANIFEST:
+            found_manifest = True
+        if fn == _MANIFEST_DB:
+            found_manifest_db = True
+
+        hsc_src_list[fn] = fp
+
+    if not found_manifest:
+        raise FileNotFoundError("Cannot find Manifest")
+    if not found_manifest_db:
+        raise FileNotFoundError("Cannot find Manifest DB")
+
+    out_print("Compiling Manifest")
+
     payload_info = read_payload_info()
-
     payload_info["hsc_version"] = HSC_VERSION
 
-    # at first always check HSC_META
-    if check_src_payload(HSC_META, payload_info):
-        print("  > compiled ...", HSC_META)
+    # at first always check _MANIFEST
+    if check_src_payload(_MANIFEST, hsc_src_list[_MANIFEST], payload_info, is_manifest=True):
+        out_print("  > compiled ...", _MANIFEST)
     else:
-        print("  > ............", HSC_META)
+        out_print("  > ............", _MANIFEST)
+
+    # check _MANIFEST_DB
+    if check_src_payload(_MANIFEST_DB, hsc_src_list[_MANIFEST_DB], payload_info, is_manifest=True):
+        out_print("  > compiled ...", _MANIFEST_DB)
+    else:
+        out_print("  > ............", _MANIFEST_DB)
+
+    out_print('')
+    out_print("Compiling Horde Smart Contract (HSC)")
 
     # check other sources
-    for key in HSC_SRC_LIST:
-        if key == HSC_META:
+    for fn, fp in hsc_src_list.items():
+        if fn == _MANIFEST or fn == _MANIFEST_DB:
             continue
 
-        if check_src_payload(key, payload_info):
-            if key not in payload_info:
-                print("  > ERROR ......", key)
+        if check_src_payload(fn, fp, payload_info):
+            if fn not in payload_info:
+                out_print("  > ERROR ......", fn)
                 continue
             else:
-                print("  > compiled ...", key)
+                out_print("  > compiled ...", fn)
         else:
-            print("  > ............", key)
+            out_print("  > ............", fn)
 
     # save payload info.
     write_payload_info(payload_info)
+    out_print('')
 
 
 if __name__ == '__main__':
     try:
         hsc_compile()
         exit(False)
-    except Exception:
-        traceback.print_exception(*sys.exc_info())
-        exit()
+    except Exception as e:
+        err_print(e)
+        if not QUIET_MODE:
+            traceback.print_exception(*sys.exc_info())
+        exit(True)

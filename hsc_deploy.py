@@ -16,24 +16,11 @@ if 'AERGO_TARGET' in os.environ:
 if 'AERGO_WAITING_TIME' in os.environ:
     AERGO_WAITING_TIME = os.environ['AERGO_WAITING_TIME']
 
-HSC_META = 'hsc_meta.lua'
-HSC_DB = 'hsc_db.lua'
-HSC_CMD = 'hsc_cmd.lua'
-HSC_RESULT = 'hsc_result.lua'
-HSC_CONFIG = 'hsc_config.lua'
-HSC_POND = 'hsc_pond.lua'
-
-HSC_SRC_LIST = [
-    HSC_META,
-    HSC_DB,
-    HSC_CMD,
-    HSC_RESULT,
-    HSC_CONFIG,
-    HSC_POND,
-]
-
 HSC_COMPILED_PAYLOAD_DATA_FILE = "./hsc.compiled.payload.dat"
 HSC_DEPLOYED_PAYLOAD_DATA_FILE = "./hsc.deployed.payload.dat"
+
+_MANIFEST = '_manifest.lua'
+QUIET_MODE = False
 
 
 def exit(error=True):
@@ -49,8 +36,14 @@ def exit(error=True):
     sys.exit(0)
 
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+def out_print(*args, **kwargs):
+    if not QUIET_MODE:
+        print(*args, **kwargs)
+
+
+def err_print(*args, **kwargs):
+    if not QUIET_MODE:
+        print(*args, file=sys.stderr, **kwargs)
 
 
 def read_payload_info(payload_path):
@@ -77,9 +70,9 @@ def check_aergo_conn_info(target, private_key):
     aergo.new_account(private_key=private_key)
 
     if private_key is None:
-        print("Account:")
-        print("  Private Key: " + str(aergo.account.private_key))
-        print("  Address: " + str(aergo.account.address))
+        out_print("Account:")
+        out_print("  Private Key: " + str(aergo.account.private_key))
+        out_print("  Address: " + str(aergo.account.address))
 
     return aergo
 
@@ -88,18 +81,14 @@ def deploy_sc(aergo, payload, args=None):
     # send TX
     tx, result = aergo.deploy_sc(payload=payload, args=args)
     if result.status != herapy.CommitStatus.TX_OK:
-        eprint("ERROR[{0}]: {1}".format(result.status, result.detail))
-        aergo.disconnect()
-        exit()
+        raise RuntimeError("[{0}]: {1}".format(result.status, result.detail))
 
     time.sleep(int(AERGO_WAITING_TIME))
 
     # check TX
     result = aergo.get_tx_result(tx.tx_hash)
     if result.status != herapy.SmartcontractStatus.CREATED:
-        eprint("ERROR[{0}]:{1}: {2}".format(result.contract_address, result.status, result.detail))
-        aergo.disconnect()
-        exit()
+        raise RuntimeError("[{0}]:{1}: {2}".format(result.contract_address, result.status, result.detail))
 
     return result.contract_address
 
@@ -108,18 +97,17 @@ def call_sc(aergo, hsc_address, func_name, args=None):
     # send TX
     tx, result = aergo.call_sc(hsc_address, func_name, args=args)
     if result.status != herapy.CommitStatus.TX_OK:
-        eprint("ERROR[{0}]: {1}".format(result.status, result.detail))
-        aergo.disconnect()
-        exit()
+        raise RuntimeError("[{0}]: {1}".format(result.status, result.detail))
 
     time.sleep(int(AERGO_WAITING_TIME))
 
     # check TX
     result = aergo.get_tx_result(tx.tx_hash)
     if result.status != herapy.SmartcontractStatus.SUCCESS:
-        eprint("ERROR[{0}]:{1}: {2}".format(result.contract_address, result.status, result.detail))
-        aergo.disconnect()
-        exit()
+        err_print(result)
+        raise RuntimeError("[{0}]:{1}: {2}".format(result.contract_address, result.status, result.detail))
+
+    return result
 
 
 def query_sc(aergo, hsc_address, func_name, args=None):
@@ -146,8 +134,6 @@ def try_to_deploy(aergo, key, payload, deployed_info, args=None, force=False):
 
 
 def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
-    print("Deploying Horde Smart Contract (HSC)")
-
     # read compiled payload info.
     compiled_info = read_payload_info(compiled_payload_file_path)
 
@@ -155,6 +141,7 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
     deployed_info = read_payload_info(deployed_payload_file_path)
 
     # at first check whether HSC is deployed or not
+    version_is_same = False
     try:
         if compiled_info['hsc_version'] != deployed_info['hsc_version']:
             need_to_change_all = True
@@ -166,10 +153,11 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
             version = version.decode('utf-8')
 
             if compiled_info['hsc_version'] in version:
-                print("HSC is already deployed (Version: {})".format(version))
+                out_print("HSC is already deployed (Version: {})".format(version))
                 need_to_change_all = False
+                version_is_same = True
             else:
-                print("Version is different: (expect) \"{0}\" != (deployed) {1}".format(compiled_info['hsc_version'],
+                out_print("Version is different: (expect) \"{0}\" != (deployed) {1}".format(compiled_info['hsc_version'],
                                                                                         version))
                 need_to_change_all = True
     except:
@@ -177,59 +165,68 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
 
     deployed_info['hsc_version'] = compiled_info['hsc_version']
 
-    # always check HSC_META
-    if try_to_deploy(aergo=aergo, key=HSC_META,
-                     payload=compiled_info[HSC_META]['payload'],
-                     deployed_info=deployed_info,
-                     force=need_to_change_all):
-        need_to_change_all = True
-        print("  > deployed ...", HSC_META)
-    else:
-        need_to_change_all = False
-        print("  > ............", HSC_META)
+    out_print("Deploying Manifest")
 
-    hsc_address = deployed_info[HSC_META]['address']
+    # at first always check _MANIFEST
+    for k, v in compiled_info.items():
+        if k == _MANIFEST:
+            if try_to_deploy(aergo=aergo, key=k, payload=v['payload'],
+                             deployed_info=deployed_info,
+                             force=need_to_change_all):
+                need_to_change_all = True
+                out_print("  > deployed ...", k)
+            else:
+                need_to_change_all = False
+                out_print("  > ............", k)
+            break
 
-    # always check HSC_DB
-    if try_to_deploy(aergo=aergo, key=HSC_DB,
-                     payload=compiled_info[HSC_DB]['payload'],
-                     deployed_info=deployed_info,
-                     args=hsc_address,
-                     force=need_to_change_all):
-        need_to_change_all = True
-        print("  > deployed ...", HSC_DB)
-    else:
-        need_to_change_all = False
-        print("  > ............", HSC_DB)
+    hsc_address = deployed_info[_MANIFEST]['address']
 
-    # check other sources
-    for key in HSC_SRC_LIST:
-        if key == HSC_META or key == HSC_DB:
+    # check other manifest modules
+    for k, v in compiled_info.items():
+        if k == 'hsc_version' or k == _MANIFEST:
             continue
 
-        if try_to_deploy(aergo=aergo, key=key,
-                         payload=compiled_info[key]['payload'],
+        if v['is_manifest']:
+            if try_to_deploy(aergo=aergo, key=k, payload=v['payload'],
+                             deployed_info=deployed_info,
+                             args=hsc_address,
+                             force=need_to_change_all):
+                need_to_change_all = True
+                out_print("  > deployed ...", k)
+            else:
+                need_to_change_all = False
+                out_print("  > ............", k)
+
+    out_print('')
+    out_print("Deploying Horde Smart Contract (HSC)")
+
+    # check other sources
+    for k, v in compiled_info.items():
+        if k == 'hsc_version' or v['is_manifest']:
+            continue
+
+        if try_to_deploy(aergo=aergo, key=k, payload=v['payload'],
                          deployed_info=deployed_info,
                          args=hsc_address,
                          force=need_to_change_all):
-            need_to_change_all = True
-            print("  > deployed ...", key)
+            out_print("  > deployed ...", k)
         else:
-            need_to_change_all = False
-            print("  > ............", key)
+            out_print("  > ............", k)
 
     # set HSC version
-    call_sc(aergo, hsc_address, "setVersion", [deployed_info['hsc_version']])
+    if not version_is_same:
+        call_sc(aergo, hsc_address, "setVersion", [deployed_info['hsc_version']])
 
-    print()
-    print("Horde Smart Contract Address =", hsc_address)
+    out_print()
+    out_print("Horde Smart Contract Address =", hsc_address)
 
     deployed_info['hsc_address'] = hsc_address
 
     # save payload info.
     write_payload_info(payload_info=deployed_info, payload_path=deployed_payload_file_path)
 
-    print("Prepared Horde Smart Contract")
+    out_print("Prepared Horde Smart Contract")
     return hsc_address
 
 
@@ -241,31 +238,37 @@ def main(target, private_key, waiting_time):
     global AERGO_WAITING_TIME
     AERGO_WAITING_TIME = waiting_time
 
+    aergo = None
     try:
         aergo = check_aergo_conn_info(target, private_key)
         aergo.get_account()
-        print("  > Account Info")
-        print('    - Nonce:        %s' % aergo.account.nonce)
-        print('    - balance:      %s' % aergo.account.balance.aergo)
+        out_print("  > Account Info")
+        out_print('    - Nonce:        %s' % aergo.account.nonce)
+        out_print('    - balance:      %s' % aergo.account.balance.aergo)
 
         if target == AERGO_TARGET and int(aergo.account.balance) == 0:
-            print("Not enough balance.\n")
-            print("You need to request AERGO tokens on\n\n  https://faucet.aergoscan.io/\n")
-            print("with the address:")
-            print("\n  %s\n" % aergo.account.address)
-            print("And deploy again with the private key:")
-            print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
-            exit()
+            out_print("Not enough balance.\n")
+            out_print("You need to request AERGO tokens on\n\n  https://faucet.aergoscan.io/\n")
+            out_print("with the address:")
+            out_print("\n  %s\n" % aergo.account.address)
+            out_print("And deploy again with the private key:")
+            out_print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
+            raise RuntimeError("not enough balance")
 
         hsc_address = hsc_deploy(aergo=aergo,
                                  compiled_payload_file_path=HSC_COMPILED_PAYLOAD_DATA_FILE,
                                  deployed_payload_file_path=HSC_DEPLOYED_PAYLOAD_DATA_FILE)
-        print("Deployed HSC Address: {}".format(hsc_address))
+        out_print("Deployed HSC Address: {}".format(hsc_address))
 
         exit(False)
-    except Exception:
-        traceback.print_exception(*sys.exc_info())
+    except Exception as e:
+        err_print(e)
+        if not QUIET_MODE:
+            traceback.print_exception(*sys.exc_info())
         exit()
+    finally:
+        if aergo is not None:
+            aergo.disconnect()
 
 
 if __name__ == '__main__':
