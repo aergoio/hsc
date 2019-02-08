@@ -74,13 +74,4 @@ function select(sql, ...)
   return rows
 end
 
-function updateCommandTarget(cmd_id, hmc_id, finished)
-  system.print(MODULE_NAME .. "updateCommandTarget: cmd_id=" .. cmd_id .. ", hmc_id=".. hmc_id .. ", finished=" .. finished)
-
-  -- insert command target
-  local stmt = db.prepare("UPDATE cmd_target SET finished = ? WHERE cmd_id = ? AND hmc_id = ?")
-  stmt:exec(finished, cmd_id, hmc_id)
-end
-
 abi.register(createTable, alterTable, insert, update, delete, select)
-abi.register(updateCommandTarget)

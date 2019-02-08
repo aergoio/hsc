@@ -87,8 +87,8 @@ function createPond(pond_id, pond_name, is_public, metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT INTO horde_ponds(creator, pond_name, pond_id, metadata) VALUES (?, ?, ?, ?)",
-    creator, pond_name, pond_id, metadataRaw)
+    "INSERT INTO horde_ponds(creator, pond_name, pond_id, is_public, metadata) VALUES (?, ?, ?, ?, ?)",
+    creator, pond_name, pond_id, is_public, metadataRaw)
 
   -- TODO: save this activity
 
@@ -255,7 +255,7 @@ function updatePond(pond_id, pond_name, is_public, metadata)
       __func_name = "updatePond",
       __status_code = "403",
       __status_sub_code = "3",
-      __err_msg = "Sender (" .. sender .. ") doesn't allow to update the blockchain (" .. pond_id .. ")",
+      __err_msg = "Sender (" .. sender .. ") doesn't allow to update the blockchain (" .. pond_id .. ") info",
       sender = sender,
       pond_creator = creator,
       pond_id = pond_id
@@ -314,7 +314,7 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
   end
   system.print(MODULE_NAME .. "createBNode: res=" .. json:encode(res))
 
-  local pond_creator = res["creator"]
+  local pond_creator = res["pond_creator"]
   local is_public = res["is_public"]
 
   local sender = system.getSender()
@@ -343,7 +343,7 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
   -- TODO: save this activity
 
   local pond_name = res["pond_name"]
-  local pond_metadata = res["metadata"]
+  local pond_metadata = res["pond_metadata"]
 
   -- success to write (201 Created)
   return {
@@ -376,12 +376,12 @@ function getAllBNodes(pond_id)
   if "200" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "createBNode: res=" .. json:encode(res))
+  system.print(MODULE_NAME .. "getAllBNodes: res=" .. json:encode(res))
 
-  local pond_creator = res["creator"]
+  local pond_creator = res["pond_creator"]
   local pond_name = res["pond_name"]
   local is_public = res["is_public"]
-  local pond_metadata = res["metadata"]
+  local pond_metadata = res["pond_metadata"]
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
@@ -445,12 +445,12 @@ function getBNode(pond_id, bnode_id)
   if "200" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "createBNode: res=" .. json:encode(res))
+  system.print(MODULE_NAME .. "getBNode: res=" .. json:encode(res))
 
-  local pond_creator = res["creator"]
+  local pond_creator = res["pond_creator"]
   local pond_name = res["pond_name"]
   local is_public = res["is_public"]
-  local pond_metadata = res["metadata"]
+  local pond_metadata = res["pond_metadata"]
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
@@ -511,11 +511,11 @@ function deleteBNode(pond_id, bnode_id)
   system.print(MODULE_NAME .. "deleteBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id)
 
   -- read created Pond
-  local res = getBNode(pond_id)
+  local res = getBNode(pond_id, bnode_id)
   if "200" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "deletePond: res=" .. json:encode(res))
+  system.print(MODULE_NAME .. "deleteBNode: res=" .. json:encode(res))
 
   local pond_creator = res["pond_creator"]
   local bnode_info = res["bnode_list"][1]

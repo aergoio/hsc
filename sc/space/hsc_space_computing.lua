@@ -29,248 +29,477 @@ function constructor(manifestAddress)
   __init__(manifestAddress)
   system.print(MODULE_NAME .. "constructor: manifestAddress=" .. manifestAddress)
 
-  -- create Horde master table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_master(
-    horde_id        TEXT PRIMARY KEY,
-    info            TEXT
+  -- create Horde master metadata table for CNodes
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS hordes(
+    horde_owner TEXT NOT NULL,
+    horde_name  TEXT,
+    horde_id    TEXT NOT NULL,
+    is_public   INTEGER DEFAULT 0,
+    metadata    TEXT,
+    PRIMARY KEY (horde_id)
   )]])
 
   -- create Horde CNode metadata table
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_cnodes(
-    horde_id        TEXT,
-    cnode_id        TEXT,
-    info            TEXT,
+    horde_id    TEXT NOT NULL,
+    cnode_owner TEXT NOT NULL,
+    cnode_name  TEXT,
+    cnode_id    TEXT NOT NULL,
+    metadata    TEXT,
     PRIMARY KEY(horde_id, cnode_id),
-    FOREIGN KEY(horde_id) REFERENCES horde_master(horde_id)
+    FOREIGN KEY(horde_id) REFERENCES hordes(horde_id)
       ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 
-  -- create Horde CNode containers metadata table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_containers(
-    horde_id        TEXT,
-    cnode_id        TEXT,
-    container_id    TEXT,
-    info            TEXT,
+  -- create Horde CNode containers information table
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_cnode_containers(
+    horde_id        TEXT NOT NULL,
+    cnode_id        TEXT NOT NULL,
+    container_id    TEXT NOT NULL,
+    container_info  TEXT,
     PRIMARY KEY(horde_id, cnode_id, container_id),
     FOREIGN KEY(horde_id, cnode_id) REFERENCES horde_cnodes(horde_id, cnode_id)
       ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
-
-  -- create Horde Pond metadata table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS ponds(
-    pond_name     TEXT,
-    pond_id       TEXT,
-    creator       TEXT,
-    info          TEXT,
-    PRIMARY KEY(pond_id, creator)
-  )]])
-
-  -- create Horde BNode metadata table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS bnodes(
-    bnode_name    TEXT,
-    bnode_id      TEXT,
-    pond_id       TEXT,
-    creator       TEXT,
-    info          TEXT,
-    PRIMARY KEY(pond_id, bnode_id, creator)
-    FOREIGN KEY(pond_id) REFERENCES ponds(pond_id)
-      ON DELETE CASCADE ON UPDATE NO ACTION
-  )]])
 end
 
-function registerHorde(horde_id, info, clean)
-  system.print(MODULE_NAME .. "registerHorde: horde_id=" .. horde_id .. ", info=" .. json:encode(info) .. ", clean=" .. tostring(clean))
+local function isEmpty(v)
+  return nil == v or 0 == string.len(v)
+end
 
-  local horde_info = json:decode(info)
-  if horde_info.hmc_id ~= horde_id then
-    system.print(MODULE_NAME .. "registerHordeMaster: ERROR: cannot register Horde with a different ID.")
-    -- TODO: need raise default module error
-    return
+function addHorde(horde_id, horde_name, is_public, metadata)
+  -- TODO: report JSON type argument is not accepted for delegate call
+  metadata = json:decode(metadata)
+  local metadataRaw = json:encode(metadata)
+  system.print(MODULE_NAME .. "addHorde: horde_id=" .. horde_id .. ", horde_name=" .. horde_name .. ", is_public=" .. tostring(is_public) .. ", metadata=" .. metadataRaw)
+
+  local horde_owner = system.getSender()
+  system.print(MODULE_NAME .. "addHorde: horde_owner=" .. horde_owner)
+
+  -- default is public
+  if is_public then
+    is_public = 1
+  else
+    is_public = 0
   end
 
-  if clean then
-    -- delete all information before inserting
-    __callFunction(MODULE_NAME_DB, "delete",
-                   "DELETE FROM horde_master WHERE horde_id = ?",
-                   horde_id)
-  end
-
-  -- insert Horde information
   __callFunction(MODULE_NAME_DB, "insert",
-                 [[INSERT OR REPLACE INTO horde_master(horde_id, info) VALUES (?, ?)]],
-                 horde_id, json:encode(horde_info.info))
+    "INSERT INTO hordes(horde_owner, horde_name, horde_id, is_public, metadata) VALUES (?, ?, ?, ?, ?)",
+    horde_owner, horde_name, horde_id, is_public, metadataRaw)
 
-  -- one command to multiple CNodes
-  for _, cnode in pairs(horde_info.cnode_list) do
-    -- insert CNode info
-    system.print(MODULE_NAME .. "CNode ID = " .. cnode.id .. ", No BNodes")
-    __callFunction(MODULE_NAME_DB, "insert",
-                   [[INSERT OR REPLACE INTO horde_cnodes(horde_id, cnode_id, info) VALUES (?, ?, ?)]],
-                   horde_id, cnode.id, json:encode(cnode.info))
+  -- TODO: save this activity
 
-    if cnode.container_list ~= nil then
-      for _, container in pairs(cnode.container_list) do
-        system.print(MODULE_NAME .. "CNode ID = " .. cnode.id .. ", Container ID = " .. container.id)
-        __callFunction(MODULE_NAME_DB, "insert",
-                       [[INSERT OR REPLACE INTO horde_containers
-                            (horde_id, cnode_id, container_id, info)
-                          VALUES (?, ?, ?, ?)]],
-                       horde_id, cnode.id, container.id, json:encode(container.info))
-      end
-    end
-  end
-end
-
-function queryHorde(horde_id)
-  system.print(MODULE_NAME .. "queryHorde: horde_id=" .. horde_id)
-
-  local horde_info = {
-    hmc_id = horde_id,
-    info = {},
-    cnode_list = {}
-  }
-
-  -- get horde info
-  local rows = __callFunction(MODULE_NAME_DB, "select",
-                              [[SELECT info FROM horde_master WHERE horde_id = ?]],
-                              horde_id)
-  for _, v in pairs(rows) do
-    horde_info.info = json:decode(v[1])
-  end
-
-  -- get cnode info
-  rows = __callFunction(MODULE_NAME_DB, "select",
-                        [[SELECT cnode_id, info FROM horde_cnodes WHERE horde_id = ?]],
-                        horde_id)
-  for _, v in pairs(rows) do
-    table.insert(horde_info.cnode_list, {
-      id = v[1],
-      info = json:decode(v[2]),
-      container_list = {}
-    })
-  end
-
-  -- get container info
-  rows = __callFunction(MODULE_NAME_DB, "select",
-                        [[SELECT cnode_id, container_id, info FROM horde_containers
-                            WHERE horde_id = ? ORDER BY cnode_id]],
-                        horde_id)
-  local cnode = {}
-  for _, v in pairs(rows) do
-    local cnode_id = v[1]
-    local container_id = v[2]
-    local container_info = json:decode(v[3])
-
-    if cnode.id ~= cnode_id then
-      for _, v2 in pairs(horde_info.cnode_list) do
-        if cnode_id == v2.id then
-          cnode = v2
-          break
-        end
-      end
-    end
-
-    table.insert(cnode.container_list, {
-      id = container_id,
-      info = container_info,
-    })
-  end
-
+  -- success to write (201 Created)
   return {
     __module = MODULE_NAME,
-    __func_name = "queryHorde",
-    horde_info = horde_info,
+    __func_name = "addHorde",
+    __status_code = "201",
+    __status_sub_code = "",
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = horde_name,
+    horde_metadata = metadata,
+    is_public = is_public
   }
 end
 
-function queryAllHordes()
-  system.print(MODULE_NAME .. "queryAllHordes")
+function getHorde(horde_id)
+  system.print(MODULE_NAME .. "getHorde: horde_id=" .. horde_id)
 
-  local horde_list = {}
-
-  -- get horde info
+  -- check registered Horde
   local rows = __callFunction(MODULE_NAME_DB, "select",
-                              [[SELECT horde_id, info FROM horde_master]])
+    "SELECT horde_owner, horde_name, is_public, metadata FROM hordes WHERE horde_id = ?", horde_id)
+  local horde_owner
+  local horde_name
+  local is_public
+  local metadata
+
+  local exist = false
   for _, v in pairs(rows) do
-    system.print("horde_id=" .. v[1] .. ", horde_info=" .. v[2])
+    horde_owner = v[1]
+    horde_name = v[2]
 
-    table.insert(horde_list, {
-      hmc_id = v[1],
-      info = json:decode(v[2]),
-      cnode_list = {}
-    })
-  end
-
-  -- get cnode info
-  rows = __callFunction(MODULE_NAME_DB, "select",
-                        [[SELECT horde_id, cnode_id, info FROM horde_cnodes ORDER BY horde_id]])
-  local horde = {}
-  for _, v in pairs(rows) do
-    local horde_id = v[1]
-    local cnode_id = v[2]
-    local cnode_info = json:decode(v[3])
-
-    system.print("horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", cnode_info=" .. v[3])
-
-    if horde.id ~= horde_id then
-      for _, v2 in pairs(horde_list) do
-        if horde_id == v2.hmc_id then
-          horde = v2
-          break
-        end
-      end
+    if 1 == v[3] then
+      is_public = true
+    else
+      is_public = false
     end
 
-    table.insert(horde.cnode_list, {
-      id = cnode_id,
-      info = cnode_info,
-      container_list = {}
-    })
+    metadata = json:decode(v[4])
+
+    exist = true
   end
 
-  -- get container info
-  rows = __callFunction(MODULE_NAME_DB, "select",
-                        [[SELECT horde_id, cnode_id, container_id, info FROM horde_containers
-                            ORDER BY horde_id, cnode_id]])
-  local horde = {}
-  local cnode = {}
-  for _, v in pairs(rows) do
-    local horde_id = v[1]
-    local cnode_id = v[2]
-    local container_id = v[3]
-    local container_info = json:decode(v[4])
+  local sender = system.getSender()
 
-    system.print("horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", container_id=" .. container_id .. ", container_info=" .. v[3])
-
-    if horde.id ~= horde_id then
-      for _, v2 in pairs(horde_list) do
-        if horde_id == v2.hmc_id then
-          horde = v2
-          break
-        end
-      end
-    end
-
-    if cnode.id ~= cnode_id then
-      for _, v2 in pairs(horde.cnode_list) do
-        if cnode_id == v2.id then
-          cnode = v2
-          break
-        end
-      end
-    end
-
-    table.insert(cnode.container_list, {
-      id = container_id,
-      info = container_info
-    })
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __func_name = "getHorde",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find the computing group (" .. horde_id .. ")",
+      sender = sender,
+      horde_id = horde_id
+    }
   end
 
+  -- check permissions (403.2 Read access forbidden)
+  if sender ~= horde_owner then
+    if not is_public then
+      -- TODO: check sender's reading permission of horde
+      return {
+        __module = MODULE_NAME,
+        __func_name = "getHorde",
+        __status_code = "403",
+        __status_sub_code = "2",
+        __err_msg = "Sender (" .. sender .. ") doesn't allow to read the computing group (" .. horde_id .. ")",
+        sender = sender,
+        horde_owner = horde_owner,
+        horde_id = horde_id
+      }
+    end
+  end
+
+  -- 200 OK
   return {
     __module = MODULE_NAME,
-    __func_name = "queryAllHordes",
-    horde_list = horde_list,
+    __func_name = "getHorde",
+    __status_code = "200",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = horde_name,
+    horde_metadata = metadata,
+    is_public = is_public
   }
 end
 
-abi.register(registerHorde, queryHorde, queryAllHordes)
+function dropHorde(horde_id)
+  system.print(MODULE_NAME .. "dropHorde: horde_id=" .. horde_id)
+
+  -- read registered Horde
+  local res = getHorde(horde_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "dropHorde: res=" .. json:encode(res))
+
+  local horde_owner = res["horde_owner"]
+  local horde_name = res["horde_name"]
+  local is_public = res["is_public"]
+  local metadata = res["horde_metadata"]
+
+  -- check permissions (403.1 Execute access forbidden)
+  local sender = system.getSender()
+  if sender ~= horde_owner then
+    -- TODO: check sender's deregister (delete) permission of horde
+    return {
+      __module = MODULE_NAME,
+      __func_name = "dropHorde",
+      __status_code = "403",
+      __status_sub_code = "1",
+      __err_msg = "Sender (" .. sender .. ") doesn't allow to deregister the computing group (" .. horde_id .. ")",
+      sender = sender,
+      horde_owner = horde_owner,
+      horde_id = horde_id
+    }
+  end
+
+  --
+  __callFunction(MODULE_NAME_DB, "delete", "DELETE FROM hordes WHERE horde_id = ?", horde_id)
+
+  -- TODO: save this activity
+
+  -- 201 Created
+  return {
+    __module = MODULE_NAME,
+    __func_name = "dropHorde",
+    __status_code = "201",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = horde_name,
+    horde_metadata = metadata,
+    is_public = is_public
+  }
+end
+
+function updateHorde(horde_id, horde_name, is_public, metadata)
+  -- TODO: report JSON type argument is not accepted for delegate call
+  metadata = json:decode(metadata)
+  local metadataRaw = json:encode(metadata)
+  system.print(MODULE_NAME .. "updateHorde: horde_id=" .. horde_id .. ", horde_name=" .. tostring(horde_name) .. ", is_public=" .. tostring(is_public) .. ", metadata=" .. tostring(metadataRaw))
+
+  -- read registered Horde
+  local res = getHorde(horde_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "updateHorde: res=" .. json:encode(res))
+
+  local horde_owner = res["horde_owner"]
+
+  -- check permissions (403.3 Write access forbidden)
+  local sender = system.getSender()
+  if sender ~= horde_owner then
+    -- TODO: check sender's update permission of Horde
+    return {
+      __module = MODULE_NAME,
+      __func_name = "updateHorde",
+      __status_code = "403",
+      __status_sub_code = "3",
+      __err_msg = "Sender (" .. sender .. ") doesn't allow to update the computing group (" .. horde_id .. ") info",
+      sender = sender,
+      horde_owner = horde_owner,
+      horde_id = horde_id
+    }
+  end
+
+  -- check arguments
+  if isEmpty(horde_name) then
+    horde_name = res["horde_name"]
+  end
+  if nil == is_public then
+    is_public = res["is_public"]
+  else
+    if is_public then
+      is_public = 1
+    else
+      is_public = 0
+    end
+  end
+  if isEmpty(metadataRaw) then
+    metadata = res["horde_metadata"]
+    metadataRaw = json:encode(metadata)
+  end
+
+  __callFunction(MODULE_NAME_DB, "update",
+    "UPDATE hordes SET horde_name = ?, is_public = ?, metadata = ? WHERE horde_id = ?",
+    horde_name, is_public, metadataRaw, horde_id)
+
+  -- TODO: save this activity
+
+  -- 201 Created
+  return {
+    __module = MODULE_NAME,
+    __func_name = "updateHorde",
+    __status_code = "201",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = horde_name,
+    horde_metadata = metadata,
+    is_public = is_public
+  }
+end
+
+function addCNode(horde_id, cnode_id, cnode_name, metadata)
+  -- TODO: report JSON type argument is not accepted for delegate call
+  metadata = json:decode(metadata)
+  local metadataRaw = json:encode(metadata)
+  system.print(MODULE_NAME .. "addCNode: horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", cnode_name=" .. cnode_name .. ", metadata=" .. metadataRaw)
+
+  -- read registered Horde
+  local res = getHorde(horde_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "addCNode: res=" .. json:encode(res))
+
+  local horde_owner = res["horde_owner"]
+  local is_public = res["is_public"]
+
+  local sender = system.getSender()
+  system.print(MODULE_NAME .. "addCNode: sender=" .. sender)
+
+  -- check permissions (403.1 Execute access forbidden)
+  if sender ~= horde_owner then
+    -- TODO: check sender's register CNode permission of horde
+    return {
+      __module = MODULE_NAME,
+      __func_name = "addCNode",
+      __status_code = "403",
+      __status_sub_code = "1",
+      __err_msg = "Sender (" .. sender .. ") doesn't allow to add a new node for the computing group (" .. horde_id .. ")",
+      sender = sender,
+      horde_id = horde_id
+    }
+  end
+
+  __callFunction(MODULE_NAME_DB, "insert",
+    "INSERT INTO horde_cnodes(horde_id, cnode_owner, cnode_name, cnode_id, metadata) VALUES (?, ?, ?, ?, ?)",
+    horde_id, sender, cnode_name, cnode_id, metadataRaw)
+
+  -- TODO: save this activity
+
+  local horde_name = res["horde_name"]
+  local horde_metadata = res["horde_metadata"]
+
+  -- success to write (201 Created)
+  return {
+    __module = MODULE_NAME,
+    __func_name = "addCNode",
+    __status_code = "201",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = horde_name,
+    horde_metadata = horde_metadata,
+    is_public = is_public,
+    cnode_list = {
+      {
+        cnode_owner = sender,
+        cnode_name = cnode_name,
+        cnode_id = cnode_id,
+        cnode_metadata = metadata
+      }
+    }
+  }
+end
+
+function getAllCNodes(horde_id)
+  system.print(MODULE_NAME .. "getAllCNodes: horde_id=" .. horde_id)
+
+  -- read registered Horde
+  local res = getHorde(horde_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "getAllCNodes: res=" .. json:encode(res))
+
+  local horde_owner = res["horde_owner"]
+  local horde_name = res["horde_name"]
+  local is_public = res["is_public"]
+  local horde_metadata = res["horde_metadata"]
+
+  -- check inserted data
+  local rows = __callFunction(MODULE_NAME_DB, "select",
+    "SELECT cnode_owner, cnode_id, cnode_name, metadata FROM horde_cnodes WHERE horde_id = ?", horde_id)
+
+  local cnode_list = {}
+
+  local exist = false
+  for _, v in pairs(rows) do
+    local cnode = {
+      cnode_owner = v[1],
+      cnode_id = v[2],
+      cnode_name = v[3],
+      cnode_metadata = json:decode(v[4])
+    }
+    table.insert(cnode_list, cnode)
+
+    exist = true
+  end
+
+  local sender = system.getSender()
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __func_name = "getCNode",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find any computing node in the computing group (" .. horde_id .. ")",
+      sender = sender,
+      horde_owner = horde_owner,
+      horde_id = horde_id,
+      horde_name = horde_name,
+      horde_metadata = horde_metadata,
+      is_public = is_public
+    }
+  end
+
+  -- 200 OK
+  return {
+    __module = MODULE_NAME,
+    __func_name = "getCNode",
+    __status_code = "200",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = horde_name,
+    horde_metadata = horde_metadata,
+    is_public = is_public,
+    cnode_list = cnode_list
+  }
+end
+
+function getCNode(horde_id, cnode_id)
+  system.print(MODULE_NAME .. "getCNode: horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id)
+
+  -- read registered Horde
+  local res = getHorde(horde_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "getCNode: res=" .. json:encode(res))
+
+  local horde_owner = res["horde_owner"]
+  local horde_name = res["horde_name"]
+  local is_public = res["is_public"]
+  local horde_metadata = res["horde_metadata"]
+
+  -- check inserted data
+  local rows = __callFunction(MODULE_NAME_DB, "select",
+    "SELECT cnode_owner, cnode_name, metadata FROM horde_cnodes WHERE horde_id = ? AND cnode_id = ?", horde_id, cnode_id)
+
+  local cnode_list = {}
+
+  local exist = false
+  for _, v in pairs(rows) do
+    local cnode = {
+      cnode_id = cnode_id,
+      cnode_owner = v[1],
+      cnode_name = v[2],
+      cnode_metadata = json:decode(v[3])
+    }
+    table.insert(cnode_list, cnode)
+
+    exist = true
+  end
+
+  local sender = system.getSender()
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __func_name = "getCNode",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find the node (" .. cnode_id .. ") info in the computing group (" .. horde_id .. ")",
+      sender = sender,
+      horde_owner = horde_owner,
+      horde_id = horde_id,
+      horde_name = horde_name,
+      horde_metadata = horde_metadata,
+      is_public = is_public,
+      cnode_id = cnode_id
+    }
+  end
+
+  -- 200 OK
+  return {
+    __module = MODULE_NAME,
+    __func_name = "getCNode",
+    __status_code = "200",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = horde_name,
+    horde_metadata = horde_metadata,
+    is_public = is_public,
+    cnode_list = cnode_list
+  }
+end
+
+abi.register(addHorde, getHorde, dropHorde, updateHorde, addCNode, getCNode)
