@@ -1,15 +1,12 @@
 --
--- Horde Smart Contract (HSC): Metadata
+-- Manifest
+--
+--  !!! WARNING !!!
+--    If change anything in this code,
+--    the smart contract address of your application will be changed.
 --
 
-MODULE_NAME = "__HSC_META__"
-
-MODULE_NAME_MAIN = "__HSC_MAIN__"
-MODULE_NAME_DB = "__HSC_DB__"
-MODULE_NAME_CMD = "__HSC_CMD__"
-MODULE_NAME_RESULT = "__HSC_RESULT__"
-MODULE_NAME_CONFIG = "__HSC_CONFIG__"
-MODULE_NAME_POND = "__HSC_POND__"
+MODULE_NAME = "__MANIFEST__"
 
 local function __init__()
   local scAddress = system.getContractID()
@@ -57,7 +54,7 @@ end
 
 function __init_module__(module_name, address, ...)
   if MODULE_NAME == module_name then
-    system.print(MODULE_NAME .. "__init_module__: ERROR: cannot initialize META module.")
+    system.print(MODULE_NAME .. "__init_module__: ERROR: cannot initialize Manifest module.")
     return
   end
 
@@ -72,8 +69,7 @@ function __call_module_function__(module_name, func_name, ...)
   system.print(MODULE_NAME .. "__call_module_function__: module_name=" .. module_name .. ", func_name=" .. func_name)
 
   local address = __getModuleAddress(module_name)
-
-  system.print(MODULE_NAME .. "__call_module_function__: address=" .. address .. ", func_name=" .. func_name)
+  system.print(MODULE_NAME .. "__call_module_function__: address=" .. address)
 
   return contract.call(address, func_name, ...)
 end
@@ -103,83 +99,5 @@ function getVersion()
   return system.getItem(MODULE_NAME .. "_VERSION__")
 end
 
-function createHordeTables()
-  system.print(MODULE_NAME .. "createHordeTables")
-  return __callFunction(MODULE_NAME_DB, "createHordeTables")
-end
-
-function insertCommand(cmd, ...)
-  system.print(MODULE_NAME .. "insertCommand")
-  __callFunction(MODULE_NAME_CMD, "insertCommand", cmd, ...)
-end
-
-function queryCommand(hmc_id, finished, all)
-  system.print(MODULE_NAME .. "queryCommand")
-  return __callFunction(MODULE_NAME_CMD, "queryCommand", hmc_id, finished, all)
-end
-
-function insertResult(cmd_id, hmc_id, result)
-  system.print(MODULE_NAME .. "insertResult")
-  __callFunction(MODULE_NAME_RESULT, "insertResult", cmd_id, hmc_id, result)
-end
-
-function queryResult(cmd_id)
-  system.print(MODULE_NAME .. "queryResult")
-  return __callFunction(MODULE_NAME_RESULT, "queryResult", cmd_id)
-end
-
-function registerHordeMaster(hmc_id, info)
-  system.print(MODULE_NAME .. "registerHordeMaster")
-  return __callFunction(MODULE_NAME_CONFIG, "registerHordeMaster", hmc_id, info)
-end
-
-function queryHordeMaster(hmc_id)
-  system.print(MODULE_NAME .. "queryHordeMaster")
-  return __callFunction(MODULE_NAME_CONFIG, "queryHordeMaster", hmc_id)
-end
-
-function queryAllHordeMasters()
-  system.print(MODULE_NAME .. "queryAllHordeMasters")
-  return __callFunction(MODULE_NAME_CONFIG, "queryAllHordeMasters")
-end
-
-function insertPond(...)
-  system.print(MODULE_NAME .. "insertPond")
-  return __callFunction(MODULE_NAME_POND, "insertPond", system.getSender(), ...)
-end
-
-function queryPonds(...)
-  system.print(MODULE_NAME .. "queryPonds")
-  return __callFunction(MODULE_NAME_POND, "queryPonds", ...)
-end
-
-function insertBNode(...)
-  system.print(MODULE_NAME .. "insertBNode")
-  return __callFunction(MODULE_NAME_POND, "insertBNode", ...)
-end
-
-function updateBNode(...)
-  system.print(MODULE_NAME .. "updateBNode")
-  return __callFunction(MODULE_NAME_POND, "updateBNode", ...)
-end
-
-function queryBNodeList(...)
-  system.print(MODULE_NAME .. "queryBNodeList")
-  return __callFunction(MODULE_NAME_POND, "queryBNodeList", ...)
-end
-
 -- exposed functions
-abi.register(setVersion, getVersion, callFunction,
-  -- DB
-  createHordeTables,
-  -- CMD
-  insertCommand, queryCommand,
-  -- RESULT
-  insertResult, queryResult,
-  -- CONFIG
-  registerHordeMaster, queryHordeMaster, queryAllHordeMasters,
-  -- POND
-  insertPond, queryPonds,
-  -- BNode
-  insertBNode, updateBNode, queryBNodeList
-)
+abi.register(setVersion, getVersion, callFunction)

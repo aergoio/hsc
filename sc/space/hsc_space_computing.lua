@@ -1,8 +1,8 @@
 --
--- Horde Smart Contract (HSC): Configuration of Horde
+-- Horde Smart Contract (HSC): Computing space
 --
 
-MODULE_NAME = "__HSC_CONFIG__"
+MODULE_NAME = "__HSC_SPACE_COMPUTING__"
 
 MODULE_NAME_DB = "__MANIFEST_DB__"
 
@@ -53,6 +53,27 @@ function constructor(manifestAddress)
     info            TEXT,
     PRIMARY KEY(horde_id, cnode_id, container_id),
     FOREIGN KEY(horde_id, cnode_id) REFERENCES horde_cnodes(horde_id, cnode_id)
+      ON DELETE CASCADE ON UPDATE NO ACTION
+  )]])
+
+  -- create Horde Pond metadata table
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS ponds(
+    pond_name     TEXT,
+    pond_id       TEXT,
+    creator       TEXT,
+    info          TEXT,
+    PRIMARY KEY(pond_id, creator)
+  )]])
+
+  -- create Horde BNode metadata table
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS bnodes(
+    bnode_name    TEXT,
+    bnode_id      TEXT,
+    pond_id       TEXT,
+    creator       TEXT,
+    info          TEXT,
+    PRIMARY KEY(pond_id, bnode_id, creator)
+    FOREIGN KEY(pond_id) REFERENCES ponds(pond_id)
       ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 end
