@@ -46,3 +46,4 @@ luac.out
 __pycache__
 
 hsc.deployed.payload.dat
+tests/*.dat
