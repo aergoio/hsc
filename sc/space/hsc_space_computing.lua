@@ -156,7 +156,6 @@ function getHorde(horde_id)
         __status_sub_code = "2",
         __err_msg = "Sender (" .. sender .. ") doesn't allow to read the computing group (" .. horde_id .. ")",
         sender = sender,
-        horde_owner = horde_owner,
         horde_id = horde_id
       }
     end
@@ -203,7 +202,6 @@ function dropHorde(horde_id)
       __status_sub_code = "1",
       __err_msg = "Sender (" .. sender .. ") doesn't allow to deregister the computing group (" .. horde_id .. ")",
       sender = sender,
-      horde_owner = horde_owner,
       horde_id = horde_id
     }
   end
@@ -254,7 +252,6 @@ function updateHorde(horde_id, horde_name, is_public, metadata)
       __status_sub_code = "3",
       __err_msg = "Sender (" .. sender .. ") doesn't allow to update the computing group (" .. horde_id .. ") info",
       sender = sender,
-      horde_owner = horde_owner,
       horde_id = horde_id
     }
   end
@@ -528,8 +525,6 @@ function dropCNode(horde_id, cnode_id)
         __status_sub_code = "1",
         __err_msg = "Sender (" .. sender .. ") doesn't allow to deregister a node of the computing group (" .. horde_id .. ")",
         sender = sender,
-        horde_owner = horde_owner,
-        cnode_owner = cnode_owner,
         horde_id = horde_id,
         cnode_id = cnode_id
       }
@@ -587,8 +582,6 @@ function updateCNode(horde_id, cnode_id, cnode_name, metadata)
         __status_sub_code = "3",
         __err_msg = "Sender (" .. sender .. ") doesn't allow to update a node info of the computing group (" .. horde_id .. ")",
         sender = sender,
-        horde_owner = horde_owner,
-        cnode_owner = cnode_owner,
         horde_id = horde_id,
         cnode_id = cnode_id
       }

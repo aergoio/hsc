@@ -159,7 +159,6 @@ function getPond(pond_id)
         __status_sub_code = "2",
         __err_msg = "Sender (" .. sender .. ") doesn't allow to read the blockchain (" .. pond_id .. ")",
         sender = sender,
-        pond_creator = creator,
         pond_id = pond_id
       }
     end
@@ -206,7 +205,6 @@ function deletePond(pond_id)
       __status_sub_code = "1",
       __err_msg = "Sender (" .. sender .. ") doesn't allow to delete the blockchain (" .. pond_id .. ")",
       sender = sender,
-      pond_creator = creator,
       pond_id = pond_id
     }
   end
@@ -257,7 +255,6 @@ function updatePond(pond_id, pond_name, is_public, metadata)
       __status_sub_code = "3",
       __err_msg = "Sender (" .. sender .. ") doesn't allow to update the blockchain (" .. pond_id .. ") info",
       sender = sender,
-      pond_creator = creator,
       pond_id = pond_id
     }
   end
@@ -533,8 +530,6 @@ function deleteBNode(pond_id, bnode_id)
         __status_sub_code = "1",
         __err_msg = "Sender (" .. sender .. ") doesn't allow to delete the blockchain (" .. pond_id .. ") node",
         sender = sender,
-        pond_creator = pond_creator,
-        bnode_creator = bnode_creator,
         pond_id = pond_id,
         bnode_id = bnode_id
       }
