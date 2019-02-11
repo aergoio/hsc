@@ -139,6 +139,12 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
 
     # read deployed payload info.
     deployed_info = read_payload_info(deployed_payload_file_path)
+    copy_deployed_info = deployed_info.copy()
+    for k in copy_deployed_info:
+        if 'hsc_address' == k:
+            continue
+        if k not in compiled_info:
+            deployed_info.pop(k)
 
     # at first check whether HSC is deployed or not
     version_is_same = False

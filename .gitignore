@@ -47,3 +47,4 @@ __pycache__
 
 hsc.deployed.payload.dat
 tests/*.dat
+.env

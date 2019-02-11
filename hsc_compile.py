@@ -3,8 +3,10 @@ import sys
 import traceback
 import subprocess
 import json
+import time
 
 HSC_VERSION="v0.1.2"
+HSC_COMPILE_TIME = time.time()
 
 _MANIFEST = '_manifest.lua'
 _MANIFEST_DB = '_manifest_db.lua'
@@ -132,6 +134,7 @@ def check_src_payload(key, path, payload_info, is_manifest=False):
             'src': src,
             'payload': payload,
             'is_manifest': is_manifest,
+            'time': HSC_COMPILE_TIME,
         }
         return True
     else:
@@ -140,8 +143,11 @@ def check_src_payload(key, path, payload_info, is_manifest=False):
                 'src': src,
                 'payload': payload,
                 'is_manifest': is_manifest,
+                'time': HSC_COMPILE_TIME,
             }
             return True
+
+    payload_info[key]['time'] = HSC_COMPILE_TIME
 
     return False
 
@@ -207,6 +213,14 @@ def hsc_compile():
                 out_print("  > compiled ...", fn)
         else:
             out_print("  > ............", fn)
+
+    copy_payload_info = payload_info.copy()
+    for k, v in copy_payload_info.items():
+        if 'time' in v:
+            if v['time'] != HSC_COMPILE_TIME:
+                payload_info.pop(k)
+        elif 'hsc_version' != k:
+            payload_info.pop(k)
 
     # save payload info.
     write_payload_info(payload_info)

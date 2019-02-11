@@ -2,7 +2,7 @@
 -- Horde Smart Contract (HSC): Command
 --
 
-MODULE_NAME = "__HSC_CMD__"
+MODULE_NAME = "__HSC_COMMAND__"
 
 MODULE_NAME_DB = "__MANIFEST_DB__"
 

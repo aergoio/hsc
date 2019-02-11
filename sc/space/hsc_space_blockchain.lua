@@ -510,7 +510,7 @@ end
 function deleteBNode(pond_id, bnode_id)
   system.print(MODULE_NAME .. "deleteBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id)
 
-  -- read created Pond
+  -- read created BNode
   local res = getBNode(pond_id, bnode_id)
   if "200" ~= res["__status_code"] then
     return res
@@ -541,7 +541,7 @@ function deleteBNode(pond_id, bnode_id)
     end
   end
 
-  -- delete Pond
+  -- delete BNode
   __callFunction(MODULE_NAME_DB, "delete",
     "DELETE FROM horde_bnodes WHERE pond_id = ? AND bnode_id = ?", pond_id, bnode_id)
 
@@ -569,7 +569,7 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
   local metadataRaw = json:encode(metadata)
   system.print(MODULE_NAME .. "updateBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id .. ", bnode_name=" .. tostring(bnode_name) .. ", metadata=" .. tostring(metadataRaw))
 
-  -- read created Pond
+  -- read created BNode
   local res = getBNode(pond_id, bnode_id)
   if "200" ~= res["__status_code"] then
     return res

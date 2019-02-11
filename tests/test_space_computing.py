@@ -18,7 +18,7 @@ def query_function(func_name, args):
 
 @pytest.fixture(scope='session')
 def setup():
-    hsc_compile.QUIET_MODE = True
+    hsc_compile.QUIET_MODE = False
     hsc_compile.hsc_compile()
 
     hsc_deploy.QUIET_MODE = False
@@ -113,28 +113,27 @@ def test_create_cnode(setup):
     assert cnode1_metadata['port']['rest'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rest']
     assert cnode1_metadata['port']['profile'] == return_value['cnode_list'][0]['cnode_metadata']['port']['profile']
 
-    """
     cnode2_metadata = {
         "id": "cnode2",
-        "name": "chashire-cat",
+        "name": "zzazan",
         "ip": "127.0.0.1",
         "port": {
-            "rpc": 17845,
-            "p2p": 17846,
-            "rest": 18080,
-            "profile": 16060,
+            "rpc": 7845,
+            "p2p": 7846,
+            "rest": 8080,
+            "profile": 6060,
         },
     }
     cnode2_metadata_raw = json.dumps(cnode2_metadata)
-    response = call_function('createBNode', ['wonderland1', 'cnode2', 'chashire-cat', cnode2_metadata_raw])
+    response = call_function('addCNode', ['ogrima1', 'cnode2', 'zzazan', cnode2_metadata_raw])
     return_value = json.loads(response.detail)
-    print("Return of 'createBNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'addCNode':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getBNode', ['wonderland1', 'cnode2'])
+    response = query_function('getCNode', ['ogrima1', 'cnode2'])
     return_value = json.loads(response)
-    print("Return of 'getBNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getCNode':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
     assert cnode2_metadata['id'] == return_value['cnode_list'][0]['cnode_metadata']['id']
@@ -145,9 +144,9 @@ def test_create_cnode(setup):
     assert cnode2_metadata['port']['rest'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rest']
     assert cnode2_metadata['port']['profile'] == return_value['cnode_list'][0]['cnode_metadata']['port']['profile']
 
-    response = query_function('getAllBNodes', ['wonderland1'])
+    response = query_function('getAllCNodes', ['ogrima1'])
     return_value = json.loads(response)
-    print("Return of 'getAllBNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getAllCNodes':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
     assert cnode1_metadata['id'] == return_value['cnode_list'][0]['cnode_metadata']['id']
@@ -164,7 +163,64 @@ def test_create_cnode(setup):
     assert cnode2_metadata['port']['p2p'] == return_value['cnode_list'][1]['cnode_metadata']['port']['p2p']
     assert cnode2_metadata['port']['rest'] == return_value['cnode_list'][1]['cnode_metadata']['port']['rest']
     assert cnode2_metadata['port']['profile'] == return_value['cnode_list'][1]['cnode_metadata']['port']['profile']
-    """
+
+
+def test_drop_cnode(setup):
+    print("test_drop_cnode:", hsc_address)
+
+    response = call_function('dropCNode', ['ogrima1', 'cnode1'])
+    return_value = json.loads(response.detail)
+    print("Return of 'dropCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 201 == status_code
+
+    response = query_function('getCNode', ['ogrima1', 'cnode1'])
+    return_value = json.loads(response)
+    print("Return of 'getCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 404 == status_code
+
+    response = query_function('getAllCNodes', ['ogrima1'])
+    return_value = json.loads(response)
+    print("Return of 'getAllCNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 200 == status_code
+
+    cnode2_metadata = {
+        "id": "cnode2",
+        "name": "no-zzazan",
+        "ip": "localhost",
+        "port": {
+            "rpc": 7845,
+            "p2p": 7846,
+            "rest": 8080,
+            "profile": 6060,
+        },
+    }
+    response = call_function('updateCNode', ['ogrima1', 'cnode2', None, json.dumps(cnode2_metadata)])
+    return_value = json.loads(response.detail)
+    print("Return of 'updateCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 201 == status_code
+
+    response = query_function('getCNode', ['ogrima1', 'cnode2'])
+    return_value = json.loads(response)
+    print("Return of 'getCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 200 == status_code
+
+    response = query_function('getAllCNodes', ['ogrima1'])
+    return_value = json.loads(response)
+    print("Return of 'getAllCNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 200 == status_code
+    assert cnode2_metadata['id'] == return_value['cnode_list'][0]['cnode_metadata']['id']
+    assert cnode2_metadata['name'] == return_value['cnode_list'][0]['cnode_metadata']['name']
+    assert cnode2_metadata['ip'] == return_value['cnode_list'][0]['cnode_metadata']['ip']
+    assert cnode2_metadata['port']['rpc'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rpc']
+    assert cnode2_metadata['port']['p2p'] == return_value['cnode_list'][0]['cnode_metadata']['port']['p2p']
+    assert cnode2_metadata['port']['rest'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rest']
+    assert cnode2_metadata['port']['profile'] == return_value['cnode_list'][0]['cnode_metadata']['port']['profile']
 
 
 def test_drop_horde(setup):

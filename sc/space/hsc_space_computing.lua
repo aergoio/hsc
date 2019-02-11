@@ -195,7 +195,7 @@ function dropHorde(horde_id)
   -- check permissions (403.1 Execute access forbidden)
   local sender = system.getSender()
   if sender ~= horde_owner then
-    -- TODO: check sender's deregister (delete) permission of horde
+    -- TODO: check sender's deregister (drop) permission of horde
     return {
       __module = MODULE_NAME,
       __func_name = "dropHorde",
@@ -403,7 +403,7 @@ function getAllCNodes(horde_id)
   if not exist then
     return {
       __module = MODULE_NAME,
-      __func_name = "getCNode",
+      __func_name = "getAllCNodes",
       __status_code = "404",
       __status_sub_code = "",
       __err_msg = "cannot find any computing node in the computing group (" .. horde_id .. ")",
@@ -419,7 +419,7 @@ function getAllCNodes(horde_id)
   -- 200 OK
   return {
     __module = MODULE_NAME,
-    __func_name = "getCNode",
+    __func_name = "getAllCNodes",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
@@ -502,4 +502,135 @@ function getCNode(horde_id, cnode_id)
   }
 end
 
-abi.register(addHorde, getHorde, dropHorde, updateHorde, addCNode, getCNode)
+function dropCNode(horde_id, cnode_id)
+  system.print(MODULE_NAME .. "dropCNode: horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id)
+
+  -- read registered CNode
+  local res = getCNode(horde_id, cnode_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "dropCNode: res=" .. json:encode(res))
+
+  local horde_owner = res["horde_owner"]
+  local cnode_info = res["cnode_list"][1]
+  local cnode_owner = cnode_info["cnode_owner"]
+
+  -- check permissions (403.1 Execute access forbidden)
+  local sender = system.getSender()
+  if sender ~= horde_owner then
+    if sender ~= cnode_owner then
+      -- TODO: check sender's deregister (drop) permission of horde CNode
+      return {
+        __module = MODULE_NAME,
+        __func_name = "dropCNode",
+        __status_code = "403",
+        __status_sub_code = "1",
+        __err_msg = "Sender (" .. sender .. ") doesn't allow to deregister a node of the computing group (" .. horde_id .. ")",
+        sender = sender,
+        horde_owner = horde_owner,
+        cnode_owner = cnode_owner,
+        horde_id = horde_id,
+        cnode_id = cnode_id
+      }
+    end
+  end
+
+  -- drop CNode
+  __callFunction(MODULE_NAME_DB, "delete",
+    "DELETE FROM horde_cnodes WHERE horde_id = ? AND cnode_id = ?", horde_id, cnode_id)
+
+  -- TODO: save this activity
+
+  -- 201 Created
+  return {
+    __module = MODULE_NAME,
+    __func_name = "dropCNode",
+    __status_code = "201",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = res["horde_name"],
+    horde_metadata = res["horde_metadata"],
+    is_public = res["is_public"],
+    cnode_list = res["cnode_list"]
+  }
+end
+
+function updateCNode(horde_id, cnode_id, cnode_name, metadata)
+  -- TODO: report JSON type argument is not accepted for delegate call
+  metadata = json:decode(metadata)
+  local metadataRaw = json:encode(metadata)
+  system.print(MODULE_NAME .. "updateCNode: horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id .. ", cnode_name=" .. tostring(cnode_name) .. ", metadata=" .. tostring(metadataRaw))
+
+  -- read registered CNode
+  local res = getCNode(horde_id, cnode_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "updateCNode: res=" .. json:encode(res))
+
+  local horde_owner = res["horde_owner"]
+  local cnode_info = res["cnode_list"][1]
+  local cnode_owner = cnode_info["cnode_owner"]
+
+  -- check permissions (403.3 Write access forbidden)
+  local sender = system.getSender()
+  if sender ~= horde_owner then
+    if sender ~= cnode_owner then
+      -- TODO: check sender's update permission of Horde
+      return {
+        __module = MODULE_NAME,
+        __func_name = "updateCNode",
+        __status_code = "403",
+        __status_sub_code = "3",
+        __err_msg = "Sender (" .. sender .. ") doesn't allow to update a node info of the computing group (" .. horde_id .. ")",
+        sender = sender,
+        horde_owner = horde_owner,
+        cnode_owner = cnode_owner,
+        horde_id = horde_id,
+        cnode_id = cnode_id
+      }
+    end
+  end
+
+  -- check arguments
+  if isEmpty(cnode_name) then
+    cnode_name = cnode_info["cnode_name"]
+  end
+  if isEmpty(metadataRaw) then
+    metadata = cnode_info["cnode_metadata"]
+    metadataRaw = json:encode(metadata)
+  end
+
+  __callFunction(MODULE_NAME_DB, "update",
+    "UPDATE horde_cnodes SET cnode_name = ?, metadata = ? WHERE horde_id = ? AND cnode_id = ?",
+    cnode_name, metadataRaw, horde_id, cnode_id)
+
+  -- TODO: save this activity
+
+  -- 201 Created
+  return {
+    __module = MODULE_NAME,
+    __func_name = "updateCNode",
+    __status_code = "201",
+    __status_sub_code = "",
+    sender = sender,
+    horde_owner = horde_owner,
+    horde_id = horde_id,
+    horde_name = res["horde_name"],
+    horde_metadata = res["horde_metadata"],
+    is_public = res["is_public"],
+    cnode_list = {
+      {
+        cnode_owner = cnode_owner,
+        cnode_name = cnode_name,
+        cnode_id = cnode_id,
+        cnode_metadata = metadata
+      }
+    }
+  }
+end
+
+abi.register(addHorde, getHorde, dropHorde, updateHorde, addCNode, getAllCNodes, getCNode, dropCNode, updateCNode)
