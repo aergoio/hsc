@@ -6,7 +6,10 @@ import json
 import aergo.herapy as herapy
 import time
 
-AERGO_TARGET = "localhost:7845"
+AERGO_TESTNET = "testnet.aergo.io:7845"
+
+#AERGO_TARGET = "localhost:7845"
+AERGO_TARGET = AERGO_TESTNET
 AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
 AERGO_WAITING_TIME = 3
 
@@ -252,14 +255,14 @@ def main(target, private_key, waiting_time):
         out_print('    - Nonce:        %s' % aergo.account.nonce)
         out_print('    - balance:      %s' % aergo.account.balance.aergo)
 
-        if target == AERGO_TARGET and int(aergo.account.balance) == 0:
+        if target == AERGO_TESTNET and int(aergo.account.balance) == 0:
             out_print("Not enough balance.\n")
             out_print("You need to request AERGO tokens on\n\n  https://faucet.aergoscan.io/\n")
             out_print("with the address:")
             out_print("\n  %s\n" % aergo.account.address)
             out_print("And deploy again with the private key:")
             out_print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
-            raise RuntimeError("not enough balance")
+            exit(False)
 
         hsc_address = hsc_deploy(aergo=aergo,
                                  compiled_payload_file_path=HSC_COMPILED_PAYLOAD_DATA_FILE,
