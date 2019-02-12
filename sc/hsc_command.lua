@@ -527,5 +527,4 @@ function getCommandResult(cmd_id)
   }
 end
 
-
-abi.register(addCommand, getCommand, getCommandOfTarget, updateTarget, addCommandResult, getCommanResult)
+abi.register(addCommand, getCommand, getCommandOfTarget, updateTarget, addCommandResult, getCommandResult)
