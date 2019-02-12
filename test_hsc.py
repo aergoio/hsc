@@ -11,7 +11,7 @@ AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
 AERGO_WAITING_TIME = 3
 aergo = None
 
-HSC_META = 'hsc_meta.lua'
+HSC_MANIFEST = '_manifest.lua'
 HSC_ADDRESS = "AmgUPYeR2w8Hrh4pauwDRzykGUjvRTNEoH65S6xXawoy3CAZrEda"
 
 DEPLOY_HSC_JSON = 'hsc.deployed.payload.dat'
@@ -70,7 +70,7 @@ def get_hsc_address():
 
     """
     global HSC_ADDRESS
-    HSC_ADDRESS = deployed_info[HSC_META]['address']
+    HSC_ADDRESS = deployed_info[HSC_MANIFEST]['address']
     """
 
 
