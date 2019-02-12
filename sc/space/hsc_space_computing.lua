@@ -39,6 +39,17 @@ function constructor(manifestAddress)
     PRIMARY KEY (horde_id)
   )]])
 
+  -- create Horde access control table
+  --    * ac_detail = [TODO: categorize all object and then designate (CREATE/READ/WRITE/DELETE)]
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS hordes_ac_list(
+    horde_id        TEXT NOT NULL,
+    account_address TEXT NOT NULL,
+    ac_detail       TEXT,
+    PRIMARY KEY (horde_id, account_address)
+    FOREIGN KEY (horde_id) REFERENCES hordes(horde_id)
+      ON DELETE CASCADE ON UPDATE NO ACTION
+  )]])
+
   -- create Horde CNode metadata table
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_cnodes(
     horde_id    TEXT NOT NULL,
@@ -71,10 +82,23 @@ function addHorde(horde_id, horde_name, is_public, metadata)
   -- TODO: report JSON type argument is not accepted for delegate call
   metadata = json:decode(metadata)
   local metadataRaw = json:encode(metadata)
-  system.print(MODULE_NAME .. "addHorde: horde_id=" .. horde_id .. ", horde_name=" .. horde_name .. ", is_public=" .. tostring(is_public) .. ", metadata=" .. metadataRaw)
+  system.print(MODULE_NAME .. "addHorde: horde_id=" .. tostring(horde_id) .. ", horde_name=" .. tostring(horde_name) .. ", is_public=" .. tostring(is_public) .. ", metadata=" .. metadataRaw)
 
-  local horde_owner = system.getSender()
-  system.print(MODULE_NAME .. "addHorde: horde_owner=" .. horde_owner)
+  local sender = system.getSender()
+  system.print(MODULE_NAME .. "addHorde: sender=" .. sender)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(horde_id) then
+    return {
+      __module = MODULE_NAME,
+      __func_name = "addHorde",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      horde_id = horde_id
+    }
+  end
 
   -- default is public
   if is_public then
@@ -85,7 +109,7 @@ function addHorde(horde_id, horde_name, is_public, metadata)
 
   __callFunction(MODULE_NAME_DB, "insert",
     "INSERT INTO hordes(horde_owner, horde_name, horde_id, is_public, metadata) VALUES (?, ?, ?, ?, ?)",
-    horde_owner, horde_name, horde_id, is_public, metadataRaw)
+    sender, horde_name, horde_id, is_public, metadataRaw)
 
   -- TODO: save this activity
 
@@ -95,11 +119,102 @@ function addHorde(horde_id, horde_name, is_public, metadata)
     __func_name = "addHorde",
     __status_code = "201",
     __status_sub_code = "",
-    horde_owner = horde_owner,
+    horde_owner = sender,
     horde_id = horde_id,
     horde_name = horde_name,
     horde_metadata = metadata,
     is_public = is_public
+  }
+end
+
+function getAllHordes()
+  system.print(MODULE_NAME .. "getAllHordes")
+
+  local horde_list = {}
+  local exist = false
+
+  -- check all public Hordes
+  local rows = __callFunction(MODULE_NAME_DB, "select",
+    "SELECT horde_id, horde_owner, horde_name, metadata FROM hordes WHERE is_public = 1")
+
+  for _, v in pairs(rows) do
+    local horde = {
+      horde_id = v[1],
+      horde_owner = v[2],
+      horde_name = v[3],
+      horde_metadata = json:decode(v[4]),
+      is_public = true
+    }
+    table.insert(horde_list, horde)
+
+    exist = true
+  end
+
+  local sender = system.getSender()
+  system.print(MODULE_NAME .. "getAllHordes: sender=" .. sender)
+
+  -- check all sender's Hordes
+  rows = __callFunction(MODULE_NAME_DB, "select",
+    "SELECT horde_id, horde_name, is_public, metadata FROM hordes WHERE horde_owner = ", sender)
+
+  for _, v in pairs(rows) do
+    local is_public
+    if 1 == v[3] then
+      is_public = true
+    else
+      is_public = false
+    end
+
+    local horde = {
+      horde_id = v[1],
+      horde_owner = sender,
+      horde_name = v[2],
+      horde_metadata = json:decode(v[4]),
+      is_public = is_public
+    }
+    table.insert(horde_list, horde)
+
+    exist = true
+  end
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __func_name = "getAllHordes",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find any computing group",
+      sender = sender
+    }
+  end
+
+  -- check permissions (403.2 Read access forbidden)
+  --[[ TODO: how to set the horde admin?
+  local horde_admin = sender
+  if sender ~= horde_admin then
+    if not is_public then
+      -- TODO: check sender's reading permission of horde
+      return {
+        __module = MODULE_NAME,
+        __func_name = "getHorde",
+        __status_code = "403",
+        __status_sub_code = "2",
+        __err_msg = "Sender (" .. sender .. ") doesn't allow to read the computing group (" .. horde_id .. ")",
+        sender = sender,
+        horde_id = horde_id
+      }
+    end
+  end]]--
+
+  -- 200 OK
+  return {
+    __module = MODULE_NAME,
+    __func_name = "getAllHordes",
+    __status_code = "200",
+    __status_sub_code = "",
+    sender = sender,
+    horde_list = horde_list
   }
 end
 
@@ -131,6 +246,7 @@ function getHorde(horde_id)
   end
 
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "getHorde: sender=" .. sender)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -193,6 +309,7 @@ function dropHorde(horde_id)
 
   -- check permissions (403.1 Execute access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "dropHorde: sender=" .. sender)
   if sender ~= horde_owner then
     -- TODO: check sender's deregister (drop) permission of horde
     return {
@@ -243,6 +360,7 @@ function updateHorde(horde_id, horde_name, is_public, metadata)
 
   -- check permissions (403.3 Write access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "updateHorde: sender=" .. sender)
   if sender ~= horde_owner then
     -- TODO: check sender's update permission of Horde
     return {
@@ -395,6 +513,7 @@ function getAllCNodes(horde_id)
   end
 
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "getAllCNodes: sender=" .. sender)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -464,6 +583,7 @@ function getCNode(horde_id, cnode_id)
   end
 
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "getCNode: sender=" .. sender)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -515,6 +635,7 @@ function dropCNode(horde_id, cnode_id)
 
   -- check permissions (403.1 Execute access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "dropCNode: sender=" .. sender)
   if sender ~= horde_owner then
     if sender ~= cnode_owner then
       -- TODO: check sender's deregister (drop) permission of horde CNode
@@ -572,6 +693,7 @@ function updateCNode(horde_id, cnode_id, cnode_name, metadata)
 
   -- check permissions (403.3 Write access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "updateCNode: sender=" .. sender)
   if sender ~= horde_owner then
     if sender ~= cnode_owner then
       -- TODO: check sender's update permission of Horde
@@ -626,4 +748,4 @@ function updateCNode(horde_id, cnode_id, cnode_name, metadata)
   }
 end
 
-abi.register(addHorde, getHorde, dropHorde, updateHorde, addCNode, getAllCNodes, getCNode, dropCNode, updateCNode)
+abi.register(addHorde, getAllHordes, getHorde, dropHorde, updateHorde, addCNode, getAllCNodes, getCNode, dropCNode, updateCNode)

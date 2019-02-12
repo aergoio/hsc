@@ -134,6 +134,7 @@ function getPond(pond_id)
   end
 
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "getPond: sender=" .. sender)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -196,6 +197,7 @@ function deletePond(pond_id)
 
   -- check permissions (403.1 Execute access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "deletePond: sender=" .. sender)
   if sender ~= creator then
     -- TODO: check sender's delete permission of pond
     return {
@@ -246,6 +248,7 @@ function updatePond(pond_id, pond_name, is_public, metadata)
 
   -- check permissions (403.3 Write access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "updatePond: sender=" .. sender)
   if sender ~= creator then
     -- TODO: check sender's update permission of pond
     return {
@@ -400,6 +403,7 @@ function getAllBNodes(pond_id)
   end
 
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "getAllBNodes: sender=" .. sender)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -469,6 +473,7 @@ function getBNode(pond_id, bnode_id)
   end
 
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "getBNode: sender=" .. sender)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -520,6 +525,7 @@ function deleteBNode(pond_id, bnode_id)
 
   -- check permissions (403.1 Execute access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "deleteBNode: sender=" .. sender)
   if sender ~= pond_creator then
     if sender ~= bnode_creator then
       -- TODO: check sender's delete permission of pond
@@ -577,6 +583,7 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
 
   -- check permissions (403.3 Write access forbidden)
   local sender = system.getSender()
+  system.print(MODULE_NAME .. "updateBNode: sender=" .. sender)
   if sender ~= pond_creator then
     if sender ~= bnode_creator then
       -- TODO: check sender's update permission of pond
