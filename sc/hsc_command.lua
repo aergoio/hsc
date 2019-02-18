@@ -50,7 +50,7 @@ function constructor(manifestAddress)
     status          TEXT DEFAULT 'INIT',
     status_block_no INTEGER DEFAULT NULL,
     PRIMARY KEY(cmd_id, horde_id, cnode_id),
-    FOREIGN KEY(cmd_id) REFERENCES command(cmd_id)
+    FOREIGN KEY(cmd_id) REFERENCES commands(cmd_id)
       ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
  
