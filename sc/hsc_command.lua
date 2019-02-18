@@ -216,7 +216,7 @@ function getCommandOfTarget(horde_id, cnode_id, status)
     }
   end
 
-  local sql = [[SELECT commands.cmd_type, commands.cmd_id, commands.orderer, commands.cmd_block_no, commands.cmd_body
+  local sql = [[SELECT commands.cmd_type, commands.cmd_id, commands.orderer, commands.cmd_block_no, commands.cmd_body,
                         command_targets.horde_id, command_targets.cnode_id,
                         command_targets.status, command_targets.status_block_no
                   FROM commands INNER JOIN command_targets
