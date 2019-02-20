@@ -39,17 +39,6 @@ function constructor(manifestAddress)
     PRIMARY KEY (horde_id)
   )]])
 
-  -- create Horde access control table
-  --    * ac_detail = [TODO: categorize all object and then designate (CREATE/READ/WRITE/DELETE)]
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS hordes_ac_list(
-    horde_id        TEXT NOT NULL,
-    account_address TEXT NOT NULL,
-    ac_detail       TEXT,
-    PRIMARY KEY (horde_id, account_address)
-    FOREIGN KEY (horde_id) REFERENCES hordes(horde_id)
-      ON DELETE CASCADE ON UPDATE NO ACTION
-  )]])
-
   -- create Horde CNode metadata table
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_cnodes(
     horde_id    TEXT NOT NULL,
@@ -62,14 +51,14 @@ function constructor(manifestAddress)
       ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 
-  -- create Horde CNode containers information table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_cnode_containers(
+  -- create Horde access control table
+  --    * ac_detail = [TODO: categorize all object and then designate (CREATE/READ/WRITE/DELETE)]
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS hordes_ac_list(
     horde_id        TEXT NOT NULL,
-    cnode_id        TEXT NOT NULL,
-    container_id    TEXT NOT NULL,
-    container_info  TEXT,
-    PRIMARY KEY(horde_id, cnode_id, container_id),
-    FOREIGN KEY(horde_id, cnode_id) REFERENCES horde_cnodes(horde_id, cnode_id)
+    account_address TEXT NOT NULL,
+    ac_detail       TEXT,
+    PRIMARY KEY (horde_id, account_address)
+    FOREIGN KEY (horde_id) REFERENCES hordes(horde_id)
       ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 end

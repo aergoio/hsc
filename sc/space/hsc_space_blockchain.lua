@@ -33,12 +33,27 @@ function constructor(manifestAddress)
   --    * is_public = [1=public, 0=permissioned]
   --    * metadata  = [genesis info,]
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_ponds(
-    creator     TEXT NOT NULL,
-    pond_name   TEXT,
-    pond_id     TEXT NOT NULL,
-    is_public   INTEGER DEFAULT 0,
-    metadata    TEXT,
+    creator         TEXT NOT NULL,
+    pond_name       TEXT,
+    pond_id         TEXT NOT NULL,
+    is_public       INTEGER DEFAULT 0,
+    pond_block_no   INTEGER DEFAULT NULL,
+    metadata        TEXT,
     PRIMARY KEY (pond_id)
+  )]])
+
+  -- create BNode metadata table
+  --    * metadata = [cnode_info,]
+  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_bnodes(
+    pond_id         TEXT NOT NULL,
+    creator         TEXT NOT NULL,
+    bnode_name      TEXT,
+    bnode_id        TEXT NOT NULL,
+    bnode_block_no  INTEGER DEFAULT NULL,
+    metadata        TEXT,
+    PRIMARY KEY (pond_id, bnode_id),
+    FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
+      ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 
   -- create Pond access control table
@@ -51,44 +66,119 @@ function constructor(manifestAddress)
     FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
       ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
-
-  -- create BNode metadata table
-  --    * metadata = [cnode_info,]
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_bnodes(
-    pond_id       TEXT NOT NULL,
-    creator       TEXT NOT NULL,
-    bnode_name    TEXT,
-    bnode_id      TEXT NOT NULL,
-    metadata      TEXT,
-    PRIMARY KEY (pond_id, bnode_id),
-    FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
-      ON DELETE CASCADE ON UPDATE NO ACTION
-  )]])
 end
 
 local function isEmpty(v)
   return nil == v or 0 == string.len(v)
 end
 
+local function generateDposGenesisJson(pond_info)
+  local bnode_list = pond_info['bnode_list']
+  local bp_list = {}
+  for _, bnode in pairs(bnode_list) do
+    local bnode_metadata = bnode['bnode_metadata']
+    if bnode_metadata['is_bp'] then
+      table.insert(bp_list, bnode)
+    end
+  end
+
+  local pond_metadata = pond_info['pond_metadata']
+  if pond_metadata['pond_bp_cnt'] == table.getn(bp_list) then
+    local genesis = {
+      chain_id = {
+        version = pond_metadata['pond_version'],
+        magic = pond_info['pond_id'],
+        public = pond_info['is_public'],
+        mainnet = false,
+        consensus = 'dpos',
+        coinbasefee = pond_metadata['coinbase_fee']
+      },
+      balance = {},
+      bps = {}
+    }
+
+    -- generate balance list
+    for _, b in pairs(pond_metadata['balance_list']) do
+      local address = b['address']
+      local balance = b['balance']
+
+      genesis['balance'][address] = balance
+    end
+
+    -- generate BP list
+    for _, b in pairs(bp_list) do
+      table.insert(genesis['bps'], b['bnode_metadata']['server_id'])
+    end
+
+    return genesis
+  else
+    return nil
+  end
+end
+
 function createPond(pond_id, pond_name, is_public, metadata)
   -- TODO: report JSON type argument is not accepted for delegate call
-  metadata = json:decode(metadata)
+  if type(metadata) == 'string' then
+    metadata = json:decode(metadata)
+  end
   local metadataRaw = json:encode(metadata)
-  system.print(MODULE_NAME .. "createPond: pond_id=" .. pond_id .. ", pond_name=" .. pond_name .. ", is_public=" .. tostring(is_public) .. ", metadata=" .. metadataRaw)
+  system.print(MODULE_NAME .. "createPond: pond_id=" .. tostring(pond_id)
+          .. ", pond_name=" .. tostring(pond_name)
+          .. ", is_public=" .. tostring(is_public)
+          .. ", metadata=" .. metadataRaw)
+
+  -- TODO: handle 400 Bad Request
 
   local creator = system.getSender()
   system.print(MODULE_NAME .. "createPond: creator=" .. creator)
 
-  -- default is public
-  if is_public then
-    is_public = 1
-  else
-    is_public = 0
+  -- read created Pond
+  local res = getPond(pond_id)
+  if "404" ~= res["__status_code"] then
+    -- default is public
+    if is_public then
+      is_public = 1
+    else
+      is_public = 0
+    end
+
+    __callFunction(MODULE_NAME_DB, "insert",
+      "INSERT INTO horde_ponds(creator, pond_name, pond_id, is_public, metadata) VALUES (?, ?, ?, ?, ?)",
+      creator, pond_name, pond_id, is_public, metadataRaw)
+  end
+  system.print(MODULE_NAME .. "createPond: res=" .. json:encode(res))
+
+  -- check the created BNode info from Horde
+  local bnode_list = metadata['created_bnode_list']
+  for _, bnode in pairs(bnode_list) do
+    local bnode_id = bnode['bnode_id']
+    local bnode_name = bnode['bnode_name']
+    local bnode_metadata = bnode['bnode_metadata']
+
+    createBNode(pond_id, bnode_id, bnode_name, bnode_metadata)
   end
 
-  __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT INTO horde_ponds(creator, pond_name, pond_id, is_public, metadata) VALUES (?, ?, ?, ?, ?)",
-    creator, pond_name, pond_id, is_public, metadataRaw)
+  -- read created Pond
+  local res = getAllBNodes(pond_id)
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+  system.print(MODULE_NAME .. "createPond: res=" .. json:encode(res))
+
+  local pond_id = res['pond_id']
+  local pond_name = res['pond_name']
+  local pond_metadata = res['pond_metadata']
+  local is_public = res['is_public']
+
+  local consensus_alg = pond_metadata['consensus_alg']
+  if 'dpos' == consensus_alg then
+    pond_metadata['genesis_json'] = generateDposGenesisJson(res)
+  elseif 'raft' == consensus_alg then
+  elseif 'poa' == consensus_alg then
+  elseif 'pow' == consensus_alg then
+  end
+
+  updatePond(pond_id, pond_name, is_public, pond_metadata)
 
   -- TODO: save this activity
 
@@ -101,8 +191,9 @@ function createPond(pond_id, pond_name, is_public, metadata)
     pond_creator = creator,
     pond_id = pond_id,
     pond_name = pond_name,
-    pond_metadata = metadata,
-    is_public = is_public
+    pond_metadata = pond_metadata,
+    is_public = is_public,
+    bnode_list = res['bnode_list'],
   }
 end
 
@@ -233,9 +324,16 @@ end
 
 function updatePond(pond_id, pond_name, is_public, metadata)
   -- TODO: report JSON type argument is not accepted for delegate call
-  metadata = json:decode(metadata)
+  if type(metadata) == 'string' then
+    metadata = json:decode(metadata)
+  end
   local metadataRaw = json:encode(metadata)
-  system.print(MODULE_NAME .. "updatePond: pond_id=" .. pond_id .. ", pond_name=" .. tostring(pond_name) .. ", is_public=" .. tostring(is_public) .. ", metadata=" .. tostring(metadataRaw))
+  system.print(MODULE_NAME .. "createPond: pond_id=" .. tostring(pond_id)
+          .. ", pond_name=" .. tostring(pond_name)
+          .. ", is_public=" .. tostring(is_public)
+          .. ", metadata=" .. metadataRaw)
+
+  -- TODO: handle 400 Bad Request
 
   -- read created Pond
   local res = getPond(pond_id)
@@ -303,9 +401,14 @@ end
 
 function createBNode(pond_id, bnode_id, bnode_name, metadata)
   -- TODO: report JSON type argument is not accepted for delegate call
-  metadata = json:decode(metadata)
+  if type(metadata) == 'string' then
+    metadata = json:decode(metadata)
+  end
   local metadataRaw = json:encode(metadata)
-  system.print(MODULE_NAME .. "createBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id .. ", bnode_name=" .. bnode_name .. ", metadata=" .. metadataRaw)
+  system.print(MODULE_NAME .. "createBNode: pond_id=" .. pond_id
+          .. ", bnode_id=" .. bnode_id
+          .. ", bnode_name=" .. bnode_name
+          .. ", metadata=" .. metadataRaw)
 
   -- read created Pond
   local res = getPond(pond_id)
@@ -385,7 +488,8 @@ function getAllBNodes(pond_id)
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    "SELECT creator, bnode_id, bnode_name, metadata FROM horde_bnodes WHERE pond_id = ?", pond_id)
+    "SELECT creator, bnode_id, bnode_name, metadata FROM horde_bnodes WHERE pond_id = ? ORDER BY bnode_block_no",
+    pond_id)
 
   local bnode_list = {}
 
@@ -409,7 +513,7 @@ function getAllBNodes(pond_id)
   if not exist then
     return {
       __module = MODULE_NAME,
-      __func_name = "getBNode",
+      __func_name = "getAllBNodes",
       __status_code = "404",
       __status_sub_code = "",
       __err_msg = "cannot find any blockchain (" .. pond_id .. ") node info",
@@ -425,7 +529,7 @@ function getAllBNodes(pond_id)
   -- 200 OK
   return {
     __module = MODULE_NAME,
-    __func_name = "getBNode",
+    __func_name = "getAllBNodes",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
@@ -566,9 +670,14 @@ end
 
 function updateBNode(pond_id, bnode_id, bnode_name, metadata)
   -- TODO: report JSON type argument is not accepted for delegate call
-  metadata = json:decode(metadata)
+  if type(metadata) == 'string' then
+    metadata = json:decode(metadata)
+  end
   local metadataRaw = json:encode(metadata)
-  system.print(MODULE_NAME .. "updateBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id .. ", bnode_name=" .. tostring(bnode_name) .. ", metadata=" .. tostring(metadataRaw))
+  system.print(MODULE_NAME .. "updateBNode: pond_id=" .. pond_id
+          .. ", bnode_id=" .. bnode_id
+          .. ", bnode_name=" .. tostring(bnode_name)
+          .. ", metadata=" .. tostring(metadataRaw))
 
   -- read created BNode
   local res = getBNode(pond_id, bnode_id)

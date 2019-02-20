@@ -42,7 +42,7 @@ function constructor(manifestAddress)
   )]])
  
   -- create command targets table
-  --  * status: INIT > EXECUTING > SUCCESS or ERROR
+  --  * status: INIT > EXECUTING > DONE
   __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS command_targets(
     cmd_id          TEXT NOT NULL,
     horde_id        TEXT,
@@ -75,8 +75,8 @@ end
 function addCommand(cmd_type, cmd_body, target_list)
   -- TODO: report JSON type argument is not accepted for delegate call
   cmd_body = json:decode(cmd_body)
-  local cmd_body_raw = json:encode(cmd_body)
   target_list = json:decode(target_list)
+  local cmd_body_raw = json:encode(cmd_body)
   local target_list_raw = json:encode(target_list)
   system.print(MODULE_NAME .. "addCommand: cmd_type=" .. cmd_type .. ", cmd_body=" .. cmd_body_raw .. ", target_list=" .. target_list_raw)
 
@@ -224,11 +224,11 @@ function getCommandOfTarget(horde_id, cnode_id, status)
   local rows
 
   if isEmpty(status) then
-    sql = sql .. " AND command_targets.horde_id = ?"
+    sql = sql .. " AND ((command_targets.horde_id = ?"
     if not isEmpty(cnode_id) then
       sql = sql .. " AND command_targets.cnode_id = ?"
     end
-    sql = sql .. " ORDER BY commands.cmd_block_no"
+    sql = sql .. ") OR command_targets.horde_id IS NULL) ORDER BY commands.cmd_block_no"
 
     if isEmpty(cnode_id) then
       rows = __callFunction(MODULE_NAME_DB, "select", sql, horde_id)
