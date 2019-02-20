@@ -18,7 +18,7 @@ def query_function(func_name, args):
 
 @pytest.fixture(scope='session')
 def setup():
-    hsc_compile.QUIET_MODE = True
+    hsc_compile.QUIET_MODE = False
     hsc_compile.hsc_compile()
 
     hsc_deploy.QUIET_MODE = False
@@ -239,6 +239,12 @@ def test_delete_bnode(setup):
 def test_delete_pond(setup):
     print("test_delete_pond:", hsc_address)
 
+    response = call_function('deletePond', ['civil_war_#1'])
+    return_value = json.loads(response.detail)
+    print("Return of 'deletePond':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 201 == status_code
+
     response = call_function('deletePond', ['wonderland1'])
     return_value = json.loads(response.detail)
     print("Return of 'deletePond':\n{}".format(json.dumps(return_value, indent=2)))
@@ -262,3 +268,109 @@ def test_delete_pond(setup):
     print("Return of 'getBNode':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 404 == status_code
+
+
+def test_create_pond_from_tribe(setup):
+    print("test_create_pond_from_tribe:", hsc_address)
+
+    pond_name = "Civil War"
+    pond_id = "civil_war_#1"
+    bp_cnt = 2
+    balance_list = [
+        {
+            "address": "Tony Stark's account address",
+            "balance": "500000000000000000000000000"
+        },
+        {
+            "address": "Peter Parker's account address",
+            "balance": "50000000"
+        },
+        {
+            "address": "Natasha Romanoff's account address",
+            "balance": "50000000000000000000"
+        },
+        {
+            "address": "Bucky Barns's account address",
+            "balance": "50000000000000000000"
+        },
+        {
+            "address": "T'Challa's account address",
+            "balance": "50000000000000000000000"
+        },
+    ]
+    pond_metadata = {
+        "consensus_alg": "dpos",
+        "bp_cnt": bp_cnt,
+        "balance_list": balance_list,
+        "created_bnode_list": [
+            {
+                "bnode_id": "captain_1",
+                "bnode_name": "Steve Rogers",
+                "bnode_metadata": {
+                    "type": "team_captain",
+                    "is_bp": True,
+                    "server_id": "team_captain_steve_as_captain_1",
+                }
+            }
+        ],
+    }
+    metadata_raw = json.dumps(pond_metadata)
+    response = call_function('createPond', [pond_id, pond_name, True, metadata_raw])
+    return_value = json.loads(response.detail)
+    print("Return of 'createPond':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 201 == status_code
+
+    response = query_function('getAllBNodes', [pond_id])
+    return_value = json.loads(response)
+    print("Return of 'getAllBNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 200 == status_code
+    assert pond_metadata['bp_cnt'] == return_value['pond_metadata']['bp_cnt']
+    assert pond_metadata['consensus_alg'] == return_value['pond_metadata']['consensus_alg']
+    assert 'created_bnode_list' not in return_value['pond_metadata']
+    assert 'genesis_json' not in return_value['pond_metadata']
+
+    pond_metadata = {
+        "consensus_alg": "dpos",
+        "bp_cnt": bp_cnt,
+        "balance_list": balance_list,
+        "created_bnode_list": [
+            {
+                "bnode_id": "iron_1",
+                "bnode_name": "Spider New York Kid",
+                "bnode_metadata": {
+                    "type": "team_iron",
+                    "is_bp": True,
+                    "server_id": "team_iron_spiderman_as_iron_1",
+                }
+            },
+            {
+                "bnode_id": "iron_2",
+                "bnode_name": "Vision",
+                "bnode_metadata": {
+                    "type": "team_iron",
+                    "is_bp": True,
+                    "server_id": "team_iron_vision_as_iron_2",
+                }
+            },
+        ],
+    }
+    metadata_raw = json.dumps(pond_metadata)
+    response = call_function('createPond', [pond_id, pond_name, True, metadata_raw])
+    return_value = json.loads(response.detail)
+    print("Return of 'createPond':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 201 == status_code
+
+    response = query_function('getAllBNodes', [pond_id])
+    return_value = json.loads(response)
+    print("Return of 'getAllBNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    status_code = int(return_value["__status_code"])
+    assert 200 == status_code
+    assert pond_metadata['bp_cnt'] == return_value['pond_metadata']['bp_cnt']
+    assert pond_metadata['consensus_alg'] == return_value['pond_metadata']['consensus_alg']
+    assert 'created_bnode_list' not in return_value['pond_metadata']
+    assert 'genesis_json' in return_value['pond_metadata']
+    assert bp_cnt == len(return_value['pond_metadata']['genesis_json']['bps'])
+
