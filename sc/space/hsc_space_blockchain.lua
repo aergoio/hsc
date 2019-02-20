@@ -75,6 +75,13 @@ end
 local function generateDposGenesisJson(pond_info)
   system.print(MODULE_NAME .. "generateDposGenesisJson: pond_info=" .. json:encode(pond_info))
 
+  local pond_metadata = pond_info['pond_metadata']
+  if nil ~= pond_metadata and nil ~= pond_metadata['genesis_json'] then
+    if pond_metadata['bp_cnt'] == table.getn(pond_metadata['genesis_json']['bps']) then
+      return pond_metadata['genesis_json']
+    end
+  end
+
   local bnode_list = pond_info['bnode_list']
   local bp_list = {}
   for _, bnode in pairs(bnode_list) do
@@ -84,7 +91,6 @@ local function generateDposGenesisJson(pond_info)
     end
   end
 
-  local pond_metadata = pond_info['pond_metadata']
   if pond_metadata['bp_cnt'] <= table.getn(bp_list) then
     local genesis = {
       chain_id = {
@@ -119,15 +125,14 @@ local function generateDposGenesisJson(pond_info)
 end
 
 function createPond(pond_id, pond_name, is_public, metadata)
-  -- TODO: report JSON type argument is not accepted for delegate call
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
-  local metadataRaw = json:encode(metadata)
+  local metadata_raw = json:encode(metadata)
   system.print(MODULE_NAME .. "createPond: pond_id=" .. tostring(pond_id)
           .. ", pond_name=" .. tostring(pond_name)
           .. ", is_public=" .. tostring(is_public)
-          .. ", metadata=" .. metadataRaw)
+          .. ", metadata=" .. metadata_raw)
 
   local creator = system.getSender()
   local block_no = system.getBlockheight()
@@ -156,7 +161,7 @@ function createPond(pond_id, pond_name, is_public, metadata)
     created_bnode_list = {}
   else
     metadata["created_bnode_list"] = nil
-    metadataRaw = json:encode(metadata)
+    metadata_raw = json:encode(metadata)
   end
   system.print(MODULE_NAME .. "createPond: created_bnode_list=" .. json:encode(created_bnode_list))
 
@@ -171,7 +176,7 @@ function createPond(pond_id, pond_name, is_public, metadata)
 
     __callFunction(MODULE_NAME_DB, "insert",
       "INSERT INTO horde_ponds(creator, pond_name, pond_id, is_public, pond_block_no, metadata) VALUES (?, ?, ?, ?, ?, ?)",
-      creator, pond_name, pond_id, is_public_value, block_no, metadataRaw)
+      creator, pond_name, pond_id, is_public_value, block_no, metadata_raw)
   end
 
   -- check the created BNode info from Horde
@@ -185,10 +190,10 @@ function createPond(pond_id, pond_name, is_public, metadata)
 
   -- read created all BNodes of Pond
   local res = getAllBNodes(pond_id)
+  system.print(MODULE_NAME .. "createPond: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "createPond: res=" .. json:encode(res))
 
   local pond_metadata = res['pond_metadata']
 
@@ -224,7 +229,25 @@ function createPond(pond_id, pond_name, is_public, metadata)
 end
 
 function getPond(pond_id)
-  system.print(MODULE_NAME .. "getPond: pond_id=" .. pond_id)
+  system.print(MODULE_NAME .. "getPond: pond_id=" .. tostring(pond_id))
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getPond: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+    }
+  end
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
@@ -251,10 +274,6 @@ function getPond(pond_id)
 
     exist = true
   end
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getPond: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -305,7 +324,25 @@ function getPond(pond_id)
 end
 
 function deletePond(pond_id)
-  system.print(MODULE_NAME .. "deletePond: pond_id=" .. pond_id)
+  system.print(MODULE_NAME .. "deletePond: pond_id=" .. tostring(pond_id))
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "deletePond: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+    }
+  end
 
   -- read created Pond
   local res = getPond(pond_id)
@@ -315,10 +352,6 @@ function deletePond(pond_id)
   system.print(MODULE_NAME .. "deletePond: res=" .. json:encode(res))
 
   local creator = res["pond_creator"]
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "deletePond: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- check permissions (403.1 Execute access forbidden)
   if sender ~= creator then
@@ -358,17 +391,32 @@ function deletePond(pond_id)
 end
 
 function updatePond(pond_id, pond_name, is_public, metadata)
-  -- TODO: report JSON type argument is not accepted for delegate call
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
-  local metadataRaw = json:encode(metadata)
+  local metadata_raw = json:encode(metadata)
   system.print(MODULE_NAME .. "updatePond: pond_id=" .. tostring(pond_id)
           .. ", pond_name=" .. tostring(pond_name)
           .. ", is_public=" .. tostring(is_public)
-          .. ", metadata=" .. metadataRaw)
+          .. ", metadata=" .. metadata_raw)
 
-  -- TODO: handle 400 Bad Request
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "updatePond: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+    }
+  end
 
   -- read created Pond
   local res = getPond(pond_id)
@@ -378,10 +426,6 @@ function updatePond(pond_id, pond_name, is_public, metadata)
   system.print(MODULE_NAME .. "updatePond: res=" .. json:encode(res))
 
   local creator = res["pond_creator"]
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updatePond: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- check permissions (403.3 Write access forbidden)
   if sender ~= creator then
@@ -414,14 +458,14 @@ function updatePond(pond_id, pond_name, is_public, metadata)
     is_public_value = 0
   end
 
-  if nil == metadata or isEmpty(metadataRaw) then
+  if nil == metadata or isEmpty(metadata_raw) then
     metadata = res["pond_metadata"]
-    metadataRaw = json:encode(metadata)
+    metadata_raw = json:encode(metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "update",
     "UPDATE horde_ponds SET pond_name = ?, is_public = ?, metadata = ? WHERE pond_id = ?",
-    pond_name, is_public_value, metadataRaw, pond_id)
+    pond_name, is_public_value, metadata_raw, pond_id)
 
   -- TODO: save this activity
 
@@ -443,15 +487,33 @@ function updatePond(pond_id, pond_name, is_public, metadata)
 end
 
 function createBNode(pond_id, bnode_id, bnode_name, metadata)
-  -- TODO: report JSON type argument is not accepted for delegate call
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
-  local metadataRaw = json:encode(metadata)
-  system.print(MODULE_NAME .. "createBNode: pond_id=" .. pond_id
-          .. ", bnode_id=" .. bnode_id
-          .. ", bnode_name=" .. bnode_name
-          .. ", metadata=" .. metadataRaw)
+  local metadata_raw = json:encode(metadata)
+  system.print(MODULE_NAME .. "createBNode: pond_id=" .. tostring(pond_id)
+          .. ", bnode_id=" .. tostring(bnode_id)
+          .. ", bnode_name=" .. tostring(bnode_name)
+          .. ", metadata=" .. metadata_raw)
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "createBNode: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) or isEmpty(bnode_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+      bnode_id = bnode_id,
+    }
+  end
 
   -- read created Pond
   local res = getPond(pond_id)
@@ -462,10 +524,6 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
 
   local pond_creator = res["pond_creator"]
   local is_public = res["is_public"]
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "createBNode: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- check permissions (403.1 Execute access forbidden)
   if sender ~= pond_creator then
@@ -486,7 +544,7 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
 
   __callFunction(MODULE_NAME_DB, "insert",
     "INSERT INTO horde_bnodes(pond_id, creator, bnode_name, bnode_id, bnode_block_no, metadata) VALUES (?, ?, ?, ?, ?, ?)",
-    pond_id, sender, bnode_name, bnode_id, block_no, metadataRaw)
+    pond_id, sender, bnode_name, bnode_id, block_no, metadata_raw)
 
   -- TODO: save this activity
 
@@ -517,7 +575,25 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
 end
 
 function getAllBNodes(pond_id)
-  system.print(MODULE_NAME .. "getAllBNodes: pond_id=" .. pond_id)
+  system.print(MODULE_NAME .. "getAllBNodes: pond_id=" .. tostring(pond_id))
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getAllBNodes: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+    }
+  end
 
   -- read created Pond
   local res = getPond(pond_id)
@@ -554,10 +630,6 @@ function getAllBNodes(pond_id)
 
     exist = true
   end
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getAllBNodes: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -597,7 +669,27 @@ function getAllBNodes(pond_id)
 end
 
 function getBNode(pond_id, bnode_id)
-  system.print(MODULE_NAME .. "getBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id)
+  system.print(MODULE_NAME .. "getBNode: pond_id=" .. tostring(pond_id)
+          .. ", bnode_id=" .. tostring(bnode_id))
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getBNode: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) or isEmpty(bnode_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+      bnode_id = bnode_id,
+    }
+  end
 
   -- read created Pond
   local res = getPond(pond_id)
@@ -635,10 +727,6 @@ function getBNode(pond_id, bnode_id)
 
     exist = true
   end
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getBNode: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -679,7 +767,27 @@ function getBNode(pond_id, bnode_id)
 end
 
 function deleteBNode(pond_id, bnode_id)
-  system.print(MODULE_NAME .. "deleteBNode: pond_id=" .. pond_id .. ", bnode_id=" .. bnode_id)
+  system.print(MODULE_NAME .. "deleteBNode: pond_id=" .. tostring(pond_id)
+          .. ", bnode_id=" .. tostring(bnode_id))
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "deleteBNode: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) or isEmpty(bnode_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+      bnode_id = bnode_id,
+    }
+  end
 
   -- read created BNode
   local res = getBNode(pond_id, bnode_id)
@@ -691,10 +799,6 @@ function deleteBNode(pond_id, bnode_id)
   local pond_creator = res["pond_creator"]
   local bnode_info = res["bnode_list"][1]
   local bnode_creator = bnode_info["bnode_creator"]
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "deleteBNode: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- check permissions (403.1 Execute access forbidden)
   if sender ~= pond_creator then
@@ -739,15 +843,33 @@ function deleteBNode(pond_id, bnode_id)
 end
 
 function updateBNode(pond_id, bnode_id, bnode_name, metadata)
-  -- TODO: report JSON type argument is not accepted for delegate call
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
-  local metadataRaw = json:encode(metadata)
-  system.print(MODULE_NAME .. "updateBNode: pond_id=" .. pond_id
-          .. ", bnode_id=" .. bnode_id
+  local metadata_raw = json:encode(metadata)
+  system.print(MODULE_NAME .. "updateBNode: pond_id=" .. tostring(pond_id)
+          .. ", bnode_id=" .. tostring(bnode_id)
           .. ", bnode_name=" .. tostring(bnode_name)
-          .. ", metadata=" .. tostring(metadataRaw))
+          .. ", metadata=" .. metadata_raw)
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "updateBNode: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(pond_id) or isEmpty(bnode_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      pond_id = pond_id,
+      bnode_id = bnode_id,
+    }
+  end
 
   -- read created BNode
   local res = getBNode(pond_id, bnode_id)
@@ -759,10 +881,6 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
   local pond_creator = res["pond_creator"]
   local bnode_info = res["bnode_list"][1]
   local bnode_creator = bnode_info["bnode_creator"]
-
-  local sender = system.getSender()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updateBNode: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- check permissions (403.3 Write access forbidden)
   if sender ~= pond_creator then
@@ -786,14 +904,14 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
   if isEmpty(bnode_name) then
     bnode_name = bnode_info["bnode_name"]
   end
-  if nil == metadata or isEmpty(metadataRaw) then
+  if nil == metadata or isEmpty(metadata_raw) then
     metadata = bnode_info["bnode_metadata"]
-    metadataRaw = json:encode(metadata)
+    metadata_raw = json:encode(metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "update",
     "UPDATE horde_bnodes SET bnode_name = ?, metadata = ? WHERE pond_id = ? AND bnode_id = ?",
-    bnode_name, metadataRaw, pond_id, bnode_id)
+    bnode_name, metadata_raw, pond_id, bnode_id)
 
   -- TODO: save this activity
 

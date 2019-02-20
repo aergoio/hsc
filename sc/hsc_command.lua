@@ -73,21 +73,41 @@ local function isEmpty(v)
 end
 
 function addCommand(cmd_type, cmd_body, target_list)
-  -- TODO: report JSON type argument is not accepted for delegate call
-  cmd_body = json:decode(cmd_body)
-  target_list = json:decode(target_list)
+  if type(cmd_body) == 'string' then
+    cmd_body = json:decode(cmd_body)
+  end
   local cmd_body_raw = json:encode(cmd_body)
+  if type(target_list) == 'string' then
+    target_list = json:decode(target_list)
+  end
   local target_list_raw = json:encode(target_list)
-  system.print(MODULE_NAME .. "addCommand: cmd_type=" .. cmd_type .. ", cmd_body=" .. cmd_body_raw .. ", target_list=" .. target_list_raw)
+  system.print(MODULE_NAME .. "addCommand: cmd_type=" .. tostring(cmd_type)
+          .. ", cmd_body=" .. cmd_body_raw
+          .. ", target_list=" .. target_list_raw)
+
+  local orderer = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "addCommand: orderer=" .. orderer .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(cmd_type) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = orderer,
+      cmd_type = cmd_type,
+    }
+  end
 
   -- tx id is for command id
   local cmd_id = system.getTxhash()
-  local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "addCommand: cmd_id=" .. cmd_id .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "addCommand: cmd_id=" .. cmd_id)
 
   -- TODO: how to check sender's authorization?
-  local orderer = system.getSender()
-  system.print(MODULE_NAME .. "addCommand: orderer=" .. orderer)
 
   -- insert a new command
   __callFunction(MODULE_NAME_DB, "insert",
@@ -117,6 +137,7 @@ function addCommand(cmd_type, cmd_body, target_list)
   -- success to write (201 Created)
   return {
     __module = MODULE_NAME,
+    __block_no = block_no,
     __func_name = "addCommand",
     __status_code = "201",
     __status_sub_code = "",
@@ -130,11 +151,29 @@ function addCommand(cmd_type, cmd_body, target_list)
 end
 
 function getCommand(cmd_id)
-  system.print(MODULE_NAME .. "getCommand: cmd_id=" .. cmd_id)
+  system.print(MODULE_NAME .. "getCommand: cmd_id=" .. tostring(cmd_id))
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getCommand: sender=" .. sender .. ", block_no=" .. block_no)
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(cmd_id) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "addCommand",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      cmd_id = cmd_id,
+    }
+  end
 
   -- check inserted commands
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    "SELECT cmd_type, orderer, cmd_block_no, cmd_body FROM commands WHERE cmd_id = ?", cmd_id)
+    "SELECT cmd_type, orderer, cmd_block_no, cmd_body FROM commands WHERE cmd_id = ? ORDER BY cmd_block_no", cmd_id)
   local cmd_type
   local orderer
   local cmd_block_no
@@ -150,13 +189,11 @@ function getCommand(cmd_id)
     exist = true
   end
 
-  local sender = system.getSender()
-  system.print(MODULE_NAME .. "getCommand: sender=" .. sender)
-
   -- if not exist, (404 Not Found)
   if not exist then
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "getCommand",
       __status_code = "404",
       __status_sub_code = "",
@@ -183,6 +220,7 @@ function getCommand(cmd_id)
 
   return {
     __module = MODULE_NAME,
+    __block_no = block_no,
     __func_name = "getCommand",
     __status_code = "200",
     __status_sub_code = "",
@@ -197,15 +235,19 @@ function getCommand(cmd_id)
 end
 
 function getCommandOfTarget(horde_id, cnode_id, status)
-  system.print(MODULE_NAME .. "getCommandOfTarget: horde_id=" .. tostring(horde_id) .. ", cnode_id=" .. tostring(cnode_id) .. ", status=" .. tostring(status))
+  system.print(MODULE_NAME .. "getCommandOfTarget: horde_id=" .. tostring(horde_id)
+          .. ", cnode_id=" .. tostring(cnode_id)
+          .. ", status=" .. tostring(status))
 
   local sender = system.getSender()
-  system.print(MODULE_NAME .. "getCommandOfTarget: sender=" .. sender)
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getCommandOfTarget: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist, (400 Bad Request)
   if isEmpty(horde_id) then
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "getCommandOfTarget",
       __status_code = "400",
       __status_sub_code = "",
@@ -272,6 +314,7 @@ function getCommandOfTarget(horde_id, cnode_id, status)
   if not exist then
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "getCommandOfTarget",
       __status_code = "404",
       __status_sub_code = "",
@@ -285,6 +328,7 @@ function getCommandOfTarget(horde_id, cnode_id, status)
   -- 200 OK
   return {
     __module = MODULE_NAME,
+    __block_no = block_no,
     __func_name = "getCommandOfTarget",
     __status_code = "200",
     __status_sub_code = "",
@@ -296,15 +340,20 @@ function getCommandOfTarget(horde_id, cnode_id, status)
 end
 
 function updateTarget(cmd_id, horde_id, cnode_id, status)
-  system.print(MODULE_NAME .. "updateTarget: cmd_id=" .. tostring(cmd_id) .. ", horde_id=" .. tostring(horde_id) .. ", cnode_id=" .. tostring(cnode_id) .. ", status=" .. tostring(status))
+  system.print(MODULE_NAME .. "updateTarget: cmd_id=" .. tostring(cmd_id)
+          .. ", horde_id=" .. tostring(horde_id)
+          .. ", cnode_id=" .. tostring(cnode_id)
+          .. ", status=" .. tostring(status))
 
   local sender = system.getSender()
-  system.print(MODULE_NAME .. "updateTarget: sender=" .. sender)
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "updateTarget: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_id) or isEmpty(horde_id) or isEmpty(status) then
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "updateTarget",
       __status_code = "400",
       __status_sub_code = "",
@@ -329,6 +378,7 @@ function updateTarget(cmd_id, horde_id, cnode_id, status)
     -- TODO: check sender's update permission of target
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "updateTarget",
       __status_code = "403",
       __status_sub_code = "3",
@@ -347,6 +397,7 @@ function updateTarget(cmd_id, horde_id, cnode_id, status)
   -- 201 Created
   return {
     __module = MODULE_NAME,
+    __block_no = block_no,
     __func_name = "updateTarget",
     __status_code = "201",
     __status_sub_code = "",
@@ -364,18 +415,24 @@ function updateTarget(cmd_id, horde_id, cnode_id, status)
 end
 
 function addCommandResult(cmd_id, horde_id, cnode_id, result)
-  -- TODO: report JSON type argument is not accepted for delegate call
-  result = json:decode(result)
+  if type(result) == 'string' then
+    result = json:decode(result)
+  end
   local result_raw = json:encode(result)
-  system.print(MODULE_NAME .. "addCommandResult: cmd_id=" .. cmd_id .. ", horde_id=" .. horde_id .. ", cnode_id=" .. tostring(cnode_id) .. ", result=" .. result_raw)
+  system.print(MODULE_NAME .. "addCommandResult: cmd_id=" .. tostring(cmd_id)
+          .. ", horde_id=" .. tostring(horde_id)
+          .. ", cnode_id=" .. tostring(cnode_id)
+          .. ", result=" .. result_raw)
 
   local sender = system.getSender()
-  system.print(MODULE_NAME .. "addCommandResult: sender=" .. sender)
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "addCommandResult: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_id) or isEmpty(horde_id) then
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "addCommandResult",
       __status_code = "400",
       __status_sub_code = "",
@@ -408,6 +465,7 @@ function addCommandResult(cmd_id, horde_id, cnode_id, result)
     -- TODO: check sender is same with Horde owner or cNode owner
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "addCommandResult",
       __status_code = "403",
       __status_sub_code = "3",
@@ -430,6 +488,7 @@ function addCommandResult(cmd_id, horde_id, cnode_id, result)
   -- 201 Created
   return {
     __module = MODULE_NAME,
+    __block_no = block_no,
     __func_name = "addCommandResult",
     __status_code = "201",
     __status_sub_code = "",
@@ -444,15 +503,17 @@ function addCommandResult(cmd_id, horde_id, cnode_id, result)
 end
 
 function getCommandResult(cmd_id)
-  system.print(MODULE_NAME .. "getCommandResult: cmd_id=" .. cmd_id)
+  system.print(MODULE_NAME .. "getCommandResult: cmd_id=" .. tostring(cmd_id))
 
   local sender = system.getSender()
-  system.print(MODULE_NAME .. "getCommandResult: sender=" .. sender)
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getCommandResult: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_id) then
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "getCommandResult",
       __status_code = "400",
       __status_sub_code = "",
@@ -475,6 +536,7 @@ function getCommandResult(cmd_id)
     -- TODO: check sender's read result permission of the command
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "getCommandResult",
       __status_code = "403",
       __status_sub_code = "2",
@@ -485,7 +547,10 @@ function getCommandResult(cmd_id)
   end
 
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    "SELECT horde_id, cnode_id, result_id, result_block_no, result FROM command_results WHERE cmd_id = ? ORDER BY horde_id, result_block_no",
+    [[SELECT horde_id, cnode_id, result_id, result_block_no, result
+        FROM command_results
+        WHERE cmd_id = ?
+        ORDER BY horde_id, result_block_no]],
     cmd_id)
   local result_list = {}
   local exist = false
@@ -506,6 +571,7 @@ function getCommandResult(cmd_id)
   if not exist then
     return {
       __module = MODULE_NAME,
+      __block_no = block_no,
       __func_name = "getCommandResult",
       __status_code = "404",
       __status_sub_code = "",
@@ -518,6 +584,7 @@ function getCommandResult(cmd_id)
   -- 200 OK
   return {
     __module = MODULE_NAME,
+    __block_no = block_no,
     __func_name = "getCommandResult",
     __status_code = "200",
     __status_sub_code = "",
