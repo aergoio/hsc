@@ -35,7 +35,7 @@ function constructor(manifestAddress)
     user_address    TEXT NOT NULL,
     create_block_no INTEGER DEFAULT NULL,
     create_tx_id    TEXT NOT NULL,
-    enc_metadata    TEXT,
+    metadata        TEXT,
     PRIMARY KEY(user_id, user_address)
   )]])
 end
@@ -44,10 +44,14 @@ local function isEmpty(v)
   return nil == v or 0 == string.len(v)
 end
 
-function createUser(user_id, user_address, enc_metadata)
+function createUser(user_id, user_address, metadata)
+  if type(metadata) == 'string' then
+    metadata = json:decode(metadata)
+  end
+  local metadata_raw = json:encode(metadata)
   system.print(MODULE_NAME .. "createUser: user_id=" .. tostring(user_id)
           .. ", user_address=" .. tostring(user_address)
-          .. ", enc_metadata=" .. tostring(enc_metadata))
+          .. ", metadata=" .. metadata_raw)
 
   local sender = system.getSender()
   local block_no = system.getBlockheight()
@@ -74,8 +78,8 @@ function createUser(user_id, user_address, enc_metadata)
 
   -- insert a new user
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT INTO horde_users(user_id, user_address, create_block_no, create_tx_id, enc_metadata) VALUES (?, ?, ?, ?, ?)",
-    user_id, user_address, block_no, tx_id, enc_metadata)
+    "INSERT INTO horde_users(user_id, user_address, create_block_no, create_tx_id, metadata) VALUES (?, ?, ?, ?, ?)",
+    user_id, user_address, block_no, tx_id, metadata_raw)
 
   -- success to write (201 Created)
   return {
@@ -88,7 +92,7 @@ function createUser(user_id, user_address, enc_metadata)
     user_address = user_address,
     create_block_no = block_no,
     create_tx_id = tx_id,
-    user_enc_metadata = enc_metadata,
+    user_metadata = metadata,
   }
 end
 
@@ -115,7 +119,7 @@ function getUser(user_id)
 
   -- check inserted commands
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT user_address, create_block_no, create_tx_id, enc_metadata
+    [[SELECT user_address, create_block_no, create_tx_id, metadata
         FROM horde_users
         WHERE user_id = ?
         ORDER BY cmd_block_no]],
@@ -131,7 +135,7 @@ function getUser(user_id)
       user_address = user_address,
       create_block_no = v[2],
       create_tx_id = v[3],
-      user_enc_metadata = v[4],
+      user_metadata = json:decode(v[4]),
     })
 
     if sender == user_address then
@@ -265,14 +269,18 @@ function deleteUser(user_id, user_address)
     user_address = user_address,
     create_block_no = user_info['create_block_no'],
     create_tx_id = user_info['create_tx_id'],
-    user_enc_metadata = user_info['enc_metadata'],
+    user_metadata = user_info['metadata'],
   }
 end
 
-function updateUser(user_id, user_address, enc_metadata)
+function updateUser(user_id, user_address, metadata)
+  if type(metadata) == 'string' then
+    metadata = json:decode(metadata)
+  end
+  local metadata_raw = json:encode(metadata)
   system.print(MODULE_NAME .. "updateUser: user_id=" .. tostring(user_id)
           .. ", user_address=" .. tostring(user_address)
-          .. ", enc_metadata=" .. tostring(enc_metadata))
+          .. ", metadata=" .. metadata_raw)
 
   local sender = system.getSender()
   local block_no = system.getBlockheight()
@@ -340,8 +348,8 @@ function updateUser(user_id, user_address, enc_metadata)
   -- update
   local block_no = system.getBlockheight()
   __callFunction(MODULE_NAME_DB, "update",
-    "UPDATE horde_users SET enc_metadata = ? WHERE user_id = ? AND user_address = ?",
-    enc_metadata, user_id, user_address)
+    "UPDATE horde_users SET metadata = ? WHERE user_id = ? AND user_address = ?",
+    metadata_raw, user_id, user_address)
 
   -- TODO: save this activity
 
@@ -357,7 +365,7 @@ function updateUser(user_id, user_address, enc_metadata)
     user_address = user_address,
     create_block_no = user_info['create_block_no'],
     create_tx_id = user_info['create_tx_id'],
-    user_enc_metadata = user_info['enc_metadata'],
+    user_metadata = metadata,
   }
 end
 
