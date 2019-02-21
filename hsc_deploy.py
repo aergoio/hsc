@@ -13,8 +13,8 @@ AERGO_SQLTESTNET = "13.209.137.193:7845"
 #AERGO_TARGET = AERGO_TESTNET
 AERGO_TARGET = AERGO_SQLTESTNET
 #AERGO_TARGET = "localhost:7845"
-AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
-AERGO_WAITING_TIME = 1
+AERGO_PRIVATE_KEY = "6iRFcHu3ptnSxMx7h54HM7YkkJvdUoTQsgF6LtsMkVK3eYeBwqk"
+AERGO_WAITING_TIME = 2
 
 if 'AERGO_TARGET' in os.environ:
     AERGO_TARGET = os.environ['AERGO_TARGET']
@@ -22,8 +22,9 @@ if 'AERGO_TARGET' in os.environ:
 if 'AERGO_WAITING_TIME' in os.environ:
     AERGO_WAITING_TIME = os.environ['AERGO_WAITING_TIME']
 
-HSC_COMPILED_PAYLOAD_DATA_FILE = "./hsc.compiled.payload.dat"
-HSC_DEPLOYED_PAYLOAD_DATA_FILE = "./hsc.deployed.payload.dat"
+hsc_dir, _ = os.path.split(os.path.realpath(__file__))
+HSC_COMPILED_PAYLOAD_DATA_FILE = os.path.join(hsc_dir, "./hsc.compiled.payload.dat")
+HSC_DEPLOYED_PAYLOAD_DATA_FILE = os.path.join(hsc_dir, "./hsc.deployed.payload.dat")
 
 _MANIFEST = '_manifest.lua'
 QUIET_MODE = False

@@ -11,7 +11,8 @@ HSC_COMPILE_TIME = time.time()
 _MANIFEST = '_manifest.lua'
 _MANIFEST_DB = '_manifest_db.lua'
 
-HSC_COMPILED_PAYLOAD_DATA_FILE = "./hsc.compiled.payload.dat"
+hsc_dir, _ = os.path.split(os.path.realpath(__file__))
+HSC_COMPILED_PAYLOAD_DATA_FILE = os.path.join(hsc_dir, "./hsc.compiled.payload.dat")
 
 g_aergo_path = ""
 g_aergo_luac_path = ""
