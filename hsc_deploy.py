@@ -7,11 +7,14 @@ import aergo.herapy as herapy
 import time
 
 AERGO_TESTNET = "testnet.aergo.io:7845"
+#AERGO_SQLTESTNET = "sqltestnet.aergo.io:7845"
+AERGO_SQLTESTNET = "13.209.137.193:7845"
 
+#AERGO_TARGET = AERGO_TESTNET
+AERGO_TARGET = AERGO_SQLTESTNET
 #AERGO_TARGET = "localhost:7845"
-AERGO_TARGET = AERGO_TESTNET
 AERGO_PRIVATE_KEY = "6huq98qotz8rj3uEx99JxYrpQesLN7P1dA14NtcR1NLvD7BdumN"
-AERGO_WAITING_TIME = 3
+AERGO_WAITING_TIME = 1
 
 if 'AERGO_TARGET' in os.environ:
     AERGO_TARGET = os.environ['AERGO_TARGET']
@@ -90,7 +93,7 @@ def deploy_sc(aergo, payload, args=None):
 
     # check TX
     result = aergo.get_tx_result(tx.tx_hash)
-    if result.status != herapy.SmartcontractStatus.CREATED:
+    if result.status != herapy.TxResultStatus.CREATED:
         raise RuntimeError("[{0}]:{1}: {2}".format(result.contract_address, result.status, result.detail))
 
     return result.contract_address
@@ -106,7 +109,7 @@ def call_sc(aergo, hsc_address, func_name, args=None):
 
     # check TX
     result = aergo.get_tx_result(tx.tx_hash)
-    if result.status != herapy.SmartcontractStatus.SUCCESS:
+    if result.status != herapy.TxResultStatus.SUCCESS:
         err_print(result)
         raise RuntimeError("[{0}]:{1}: {2}".format(result.contract_address, result.status, result.detail))
 
@@ -252,17 +255,30 @@ def main(target, private_key, waiting_time):
         aergo = check_aergo_conn_info(target, private_key)
         aergo.get_account()
         out_print("  > Account Info")
+        out_print('    - Address:      %s' % aergo.account.address)
+        out_print('    - Private Key:  %s' % aergo.account.private_key)
         out_print('    - Nonce:        %s' % aergo.account.nonce)
         out_print('    - balance:      %s' % aergo.account.balance.aergo)
 
-        if target == AERGO_TESTNET and int(aergo.account.balance) == 0:
-            out_print("Not enough balance.\n")
-            out_print("You need to request AERGO tokens on\n\n  https://faucet.aergoscan.io/\n")
-            out_print("with the address:")
-            out_print("\n  %s\n" % aergo.account.address)
-            out_print("And deploy again with the private key:")
-            out_print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
-            exit(False)
+        fixed_targets = [
+            {
+                "target": AERGO_TESTNET,
+                "faucet": "https://faucet.aergoscan.io",
+            },
+            {
+                "target": AERGO_SQLTESTNET,
+                "faucet": "http://13.209.137.193:3000/",
+            },
+        ]
+        for t in fixed_targets:
+            if target == t['target'] and int(aergo.account.balance) == 0:
+                out_print("Not enough balance.\n")
+                out_print("You need to request AERGO tokens on\n\n  {}\n".format(t['faucet']))
+                out_print("with the address:")
+                out_print("\n  %s\n" % aergo.account.address)
+                out_print("And deploy again with the private key:")
+                out_print("\n  python {0} --private-key {1}\n".format(sys.argv[0], aergo.account.private_key))
+                exit(False)
 
         hsc_address = hsc_deploy(aergo=aergo,
                                  compiled_payload_file_path=HSC_COMPILED_PAYLOAD_DATA_FILE,
