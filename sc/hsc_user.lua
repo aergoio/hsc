@@ -58,7 +58,7 @@ function createUser(user_id, user_address, metadata)
   system.print(MODULE_NAME .. "createUser: sender=" .. sender .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(user_id) or sender ~= user_address then
+  if isEmpty(user_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
@@ -68,7 +68,6 @@ function createUser(user_id, user_address, metadata)
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
       user_id = user_id,
-      user_address = user_address,
     }
   end
 
@@ -78,7 +77,7 @@ function createUser(user_id, user_address, metadata)
 
   -- insert a new user
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT INTO horde_users(user_id, user_address, create_block_no, create_tx_id, metadata) VALUES (?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO horde_users(user_id, user_address, create_block_no, create_tx_id, metadata) VALUES (?, ?, ?, ?, ?)",
     user_id, user_address, block_no, tx_id, metadata_raw)
 
   -- success to write (201 Created)
@@ -89,10 +88,14 @@ function createUser(user_id, user_address, metadata)
     __status_code = "201",
     __status_sub_code = "",
     user_id = user_id,
-    user_address = user_address,
-    create_block_no = block_no,
-    create_tx_id = tx_id,
-    user_metadata = metadata,
+    user_info_list = {
+      {
+        user_address = user_address,
+        create_block_no = block_no,
+        create_tx_id = tx_id,
+        user_metadata = metadata,
+      },
+    },
   }
 end
 
@@ -122,7 +125,7 @@ function getUser(user_id)
     [[SELECT user_address, create_block_no, create_tx_id, metadata
         FROM horde_users
         WHERE user_id = ?
-        ORDER BY cmd_block_no]],
+        ORDER BY create_block_no]],
     user_id)
   local user_info_list = {}
 
@@ -266,10 +269,14 @@ function deleteUser(user_id, user_address)
     __status_sub_code = "",
     sender = sender,
     user_id = user_id,
-    user_address = user_address,
-    create_block_no = user_info['create_block_no'],
-    create_tx_id = user_info['create_tx_id'],
-    user_metadata = user_info['metadata'],
+    user_info_list = {
+      {
+        user_address = user_address,
+        create_block_no = user_info['create_block_no'],
+        create_tx_id = user_info['create_tx_id'],
+        user_metadata = user_info['metadata'],
+      },
+    },
   }
 end
 
@@ -362,10 +369,14 @@ function updateUser(user_id, user_address, metadata)
     __status_sub_code = "",
     sender = sender,
     user_id = user_id,
-    user_address = user_address,
-    create_block_no = user_info['create_block_no'],
-    create_tx_id = user_info['create_tx_id'],
-    user_metadata = metadata,
+    user_info_list = {
+      {
+        user_address = user_address,
+        create_block_no = user_info['create_block_no'],
+        create_tx_id = user_info['create_tx_id'],
+        user_metadata = metadata,
+      },
+    },
   }
 end
 
