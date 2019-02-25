@@ -154,6 +154,7 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
             deployed_info.pop(k)
 
     # at first check whether HSC is deployed or not
+    need_to_change_all = False
     version_is_same = False
     try:
         if compiled_info['hsc_version'] != deployed_info['hsc_version']:
@@ -171,8 +172,7 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
                 version_is_same = True
             else:
                 out_print("Version is different: (expect) \"{0}\" != (deployed) {1}".format(compiled_info['hsc_version'],
-                                                                                        version))
-                need_to_change_all = True
+                                                                                            version))
     except:
         need_to_change_all = True
 
@@ -228,7 +228,7 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
             out_print("  > ............", k)
 
     # set HSC version
-    if not version_is_same:
+    if not need_to_change_all or not version_is_same:
         call_sc(aergo, hsc_address, "setVersion", [deployed_info['hsc_version']])
 
     out_print()
