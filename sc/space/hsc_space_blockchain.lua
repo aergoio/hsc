@@ -197,7 +197,6 @@ function createPond(pond_id, pond_name, is_public, metadata)
     created_bnode_list = {}
   else
     metadata["created_bnode_list"] = nil
-    metadata_raw = json:encode(metadata)
   end
   system.print(MODULE_NAME
           .. "createPond: created_bnode_list="
@@ -219,7 +218,7 @@ function createPond(pond_id, pond_name, is_public, metadata)
     return res
   end
 
-  local pond_metadata = res['pond_metadata']
+  local pond_metadata = metadata
 
   local consensus_alg = pond_metadata['consensus_alg']
   if consensus_alg ~= nil then
@@ -261,7 +260,7 @@ function getPublicPonds()
   -- check all public Ponds
   local rows = __callFunction(MODULE_NAME_DB, "select",
     [[SELECT pond_id, pond_name, creator, metadata, pond_block_no
-        FROM ponds
+        FROM horde_ponds
         WHERE is_public = 1
         ORDER BY pond_block_no]])
 
@@ -327,7 +326,7 @@ function getAllPonds(creator)
   -- check all public Ponds
   local res = getPublicPonds()
   system.print(MODULE_NAME .. "getAllPonds: res=" .. json:encode(res))
-  if isEmpty(owner) then
+  if isEmpty(creator) then
     return res
   end
 
