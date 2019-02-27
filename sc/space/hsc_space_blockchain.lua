@@ -172,17 +172,6 @@ function createPond(pond_id, pond_name, is_public, metadata)
   local res = getPond(pond_id)
   system.print(MODULE_NAME .. "createPond: res=" .. json:encode(res))
 
-  local created_bnode_list = metadata['created_bnode_list']
-  if nil == created_bnode_list then
-    created_bnode_list = {}
-  else
-    metadata["created_bnode_list"] = nil
-    metadata_raw = json:encode(metadata)
-  end
-  system.print(MODULE_NAME
-          .. "createPond: created_bnode_list="
-          .. json:encode(created_bnode_list))
-
   if "404" == res["__status_code"] then
     -- check whether Pond is public
     local is_public_value = 0
@@ -203,7 +192,18 @@ function createPond(pond_id, pond_name, is_public, metadata)
       creator, pond_name, pond_id, is_public_value, block_no, metadata_raw)
   end
 
-  -- check the created BNode info from Horde
+  local created_bnode_list = metadata['created_bnode_list']
+  if nil == created_bnode_list then
+    created_bnode_list = {}
+  else
+    metadata["created_bnode_list"] = nil
+    metadata_raw = json:encode(metadata)
+  end
+  system.print(MODULE_NAME
+          .. "createPond: created_bnode_list="
+          .. json:encode(created_bnode_list))
+
+  -- check and insert the created BNode info from Horde
   for _, bnode in pairs(created_bnode_list) do
     local bnode_id = bnode['bnode_id']
     local bnode_name = bnode['bnode_name']
@@ -252,6 +252,161 @@ function createPond(pond_id, pond_name, is_public, metadata)
   }
 end
 
+function getPublicPonds()
+  system.print(MODULE_NAME .. "getPublicPonds")
+
+  local pond_list = {}
+  local exist = false
+
+  -- check all public Ponds
+  local rows = __callFunction(MODULE_NAME_DB, "select",
+    [[SELECT pond_id, pond_name, creator, metadata, pond_block_no
+        FROM ponds
+        WHERE is_public = 1
+        ORDER BY pond_block_no]])
+
+  for _, v in pairs(rows) do
+    local pond_id = v[1]
+    local bnode_list = {}
+
+    local res = getAllBNodes(pond_id)
+    system.print(MODULE_NAME .. "getPublicPonds: res=" .. json:encode(res))
+    if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
+      return res
+    elseif "200" == res["__status_code"] then
+      bnode_list = res['bnode_list']
+    end
+
+    local pond = {
+      pond_id = v[1],
+      pond_name = v[2],
+      pond_creator = v[3],
+      pond_metadata = json:decode(v[4]),
+      pond_block_no = v[5],
+      is_public = true,
+      bnode_list = bnode_list,
+    }
+    table.insert(pond_list, pond)
+
+    exist = true
+  end
+
+  local sender = __getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getPublicPonds: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "getPublicPonds",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find any public blockchain",
+      sender = sender
+    }
+  end
+
+  -- 200 OK
+  return {
+    __module = MODULE_NAME,
+    __block_no = block_no,
+    __func_name = "getPublicPonds",
+    __status_code = "200",
+    __status_sub_code = "",
+    sender = sender,
+    pond_list = pond_list
+  }
+end
+
+function getAllPonds(creator)
+  system.print(MODULE_NAME .. "getAllPonds: creator=" .. tostring(creator))
+
+  -- check all public Ponds
+  local res = getPublicPonds()
+  system.print(MODULE_NAME .. "getAllPonds: res=" .. json:encode(res))
+  if isEmpty(owner) then
+    return res
+  end
+
+  local pond_list
+  local exist = false
+  if "404" == res["__status_code"] then
+    pond_list = {}
+  elseif "200" == res["__status_code"] then
+    pond_list = res["pond_list"]
+  else
+    return res
+  end
+
+  local sender = __getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getAllPonds: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
+
+  -- check all creator's private Ponds
+  local rows = __callFunction(MODULE_NAME_DB, "select",
+    [[SELECT pond_id, pond_name, metadata, pond_block_no
+        FROM horde_ponds
+        WHERE creator= ? AND is_public = 0
+        ORDER BY pond_block_no]],
+    creator)
+
+  for _, v in pairs(rows) do
+    local pond_id = v[1]
+    local bnode_list = {}
+
+    -- read all BNodes of Pond
+    local res = getAllBNodes(pond_id)
+    system.print(MODULE_NAME .. "getAllPonds: res=" .. json:encode(res))
+    if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
+      return res
+    elseif "200" == res["__status_code"] then
+      bnode_list = res['bnode_list']
+    end
+
+    local pond = {
+      pond_creator = creator,
+      pond_id = pond_id,
+      pond_name = v[2],
+      pond_metadata = json:decode(v[3]),
+      pond_block_no = v[4],
+      is_public = false,
+      bnode_list = bnode_list,
+    }
+    table.insert(pond_list, pond)
+
+    exist = true
+  end
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "getAllPonds",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find any blockchain",
+      sender = sender,
+      creator = creator,
+    }
+  end
+
+  -- 200 OK
+  return {
+    __module = MODULE_NAME,
+    __block_no = block_no,
+    __func_name = "getAllHordes",
+    __status_code = "200",
+    __status_sub_code = "",
+    sender = sender,
+    pond_list = pond_list
+  }
+end
+
 function getPond(pond_id)
   system.print(MODULE_NAME .. "getPond: pond_id=" .. tostring(pond_id))
 
@@ -265,7 +420,7 @@ function getPond(pond_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "getPond",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -366,7 +521,7 @@ function deletePond(pond_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "deletePond",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -442,7 +597,7 @@ function updatePond(pond_id, pond_name, is_public, metadata)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "updatePond",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -540,7 +695,7 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "createBNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -628,7 +783,7 @@ function getAllBNodes(pond_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "getAllBNodes",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -724,7 +879,7 @@ function getBNode(pond_id, bnode_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "getBNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -823,7 +978,7 @@ function deleteBNode(pond_id, bnode_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "deleteBNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -907,7 +1062,7 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "updateBNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -989,5 +1144,6 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
 end
 
 -- exposed functions
-abi.register(createPond, getPond, deletePond, updatePond,
+abi.register(createPond, getPublicPonds, getAllPonds,
+  getPond, deletePond, updatePond,
   createBNode, getAllBNodes, getBNode, deleteBNode, updateBNode)

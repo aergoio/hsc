@@ -181,13 +181,25 @@ function getPublicHordes()
         ORDER BY horde_block_no]])
 
   for _, v in pairs(rows) do
+    local horde_id = v[1]
+    local cnode_list = {}
+
+    local res = getAllCNodes(horde_id)
+    system.print(MODULE_NAME .. "getPublicHordes: res=" .. json:encode(res))
+    if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
+      return res
+    elseif "200" == res["__status_code"] then
+      cnode_list = res['cnode_list']
+    end
+
     local horde = {
       horde_id = v[1],
       horde_owner = v[2],
       horde_name = v[3],
       horde_metadata = json:decode(v[4]),
       horde_block_no = v[5],
-      is_public = true
+      is_public = true,
+      cnode_list = cnode_list,
     }
     table.insert(horde_list, horde)
 
@@ -196,7 +208,8 @@ function getPublicHordes()
 
   local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getPublicHordes: sender=" .. tostring(sender) .. ", block_no=" .. tostring(block_no))
+  system.print(MODULE_NAME .. "getPublicHordes: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -206,7 +219,7 @@ function getPublicHordes()
       __func_name = "getPublicHordes",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find any computing group",
+      __err_msg = "cannot find any public computing group",
       sender = sender
     }
   end
@@ -224,14 +237,17 @@ function getPublicHordes()
 end
 
 function getAllHordes(owner)
-  system.print(MODULE_NAME .. "getAllHordes: owner=" .. owner)
-
-  local horde_list
-  local exist = false
+  system.print(MODULE_NAME .. "getAllHordes: owner=" .. tostring(owner))
 
   -- check all public Hordes
   local res = getPublicHordes()
   system.print(MODULE_NAME .. "getAllHordes: res=" .. json:encode(res))
+  if isEmpty(owner) then
+    return res
+  end
+
+  local horde_list
+  local exist = false
   if "404" == res["__status_code"] then
     horde_list = {}
   elseif "200" == res["__status_code"] then
@@ -242,58 +258,42 @@ function getAllHordes(owner)
 
   local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getAllHordes: sender=" .. tostring(sender) .. ", block_no=" .. tostring(block_no))
+  system.print(MODULE_NAME .. "getAllHordes: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
-  local rows
-  if isEmpty(owner) then
-    -- check all sender's Hordes
-    rows = __callFunction(MODULE_NAME_DB, "select",
-      [[SELECT horde_id, horde_name, is_public, metadata, horde_block_no
-          FROM hordes
-          ORDER BY horde_block_no]],
-      sender)
-  else
-    -- check all sender's Hordes
-    rows = __callFunction(MODULE_NAME_DB, "select",
-      [[SELECT horde_id, horde_name, is_public, metadata, horde_block_no
-          FROM hordes
-          WHERE horde_owner = ?
-          ORDER BY horde_block_no]],
-      owner)
-  end
+  -- check all owner's private Hordes
+  local rows = __callFunction(MODULE_NAME_DB, "select",
+    [[SELECT horde_id, horde_name, metadata, horde_block_no
+        FROM hordes
+        WHERE horde_owner = ? AND is_public = 0
+        ORDER BY horde_block_no]],
+    owner)
 
   for _, v in pairs(rows) do
-    local is_public
-    if 1 == v[3] then
-      is_public = true
-    else
-      is_public = false
+    local horde_id = v[1]
+    local cnode_list = {}
+
+    -- read all CNodes of Horde
+    local res = getAllCNodes(horde_id)
+    system.print(MODULE_NAME .. "getAllHordes: res=" .. json:encode(res))
+    if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
+      return res
+    elseif "200" == res["__status_code"] then
+      cnode_list = res['cnode_list']
     end
 
     local horde = {
-      horde_id = v[1],
-      horde_owner = sender,
+      horde_id = horde_id,
+      horde_owner = owner,
       horde_name = v[2],
-      horde_metadata = json:decode(v[4]),
-      horde_block_no = v[5],
-      is_public = is_public
+      horde_metadata = json:decode(v[3]),
+      horde_block_no = v[4],
+      is_public = false,
+      cnode_list = cnode_list,
     }
     table.insert(horde_list, horde)
 
     exist = true
-  end
-
-  -- if not exist, (404 Not Found)
-  if not exist then
-    return {
-      __module = MODULE_NAME,
-      __block_no = block_no,
-      __func_name = "getAllHordes",
-      __status_code = "404",
-      __status_sub_code = "",
-      __err_msg = "cannot find any computing group",
-      sender = sender
-    }
   end
 
   -- check permissions (403.2 Read access forbidden)
@@ -314,6 +314,20 @@ function getAllHordes(owner)
       }
     end
   end]]--
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "getAllHordes",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find any computing group",
+      sender = sender,
+      owner = owner,
+    }
+  end
 
   -- 200 OK
   return {
@@ -1061,4 +1075,6 @@ function updateCNode(horde_id, cnode_id, cnode_name, metadata)
   }
 end
 
-abi.register(addHorde, getAllHordes, getHorde, dropHorde, updateHorde, addCNode, getAllCNodes, getCNode, dropCNode, updateCNode)
+abi.register(addHorde, getPublicHordes, getAllHordes, getHorde,
+  dropHorde, updateHorde, addCNode, getAllCNodes,
+  getCNode, dropCNode, updateCNode)
