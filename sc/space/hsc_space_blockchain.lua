@@ -15,56 +15,67 @@ local function __init__(manifestAddress)
   _MANIFEST_ADDRESS:set(manifestAddress)
   local scAddress = system.getContractID()
   system.print(MODULE_NAME .. "__init__: sc_address=" .. scAddress)
-  contract.call(_MANIFEST_ADDRESS:get(), "__init_module__", MODULE_NAME, scAddress)
+  contract.call(_MANIFEST_ADDRESS:get(),
+    "__init_module__", MODULE_NAME, scAddress)
 end
 
 local function __callFunction(module_name, func_name, ...)
-  system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name .. ", func_name=" .. func_name)
-  return contract.call(_MANIFEST_ADDRESS:get(), "__call_module_function__", module_name, func_name, ...)
+  system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name
+          .. ", func_name=" .. func_name)
+  return contract.call(_MANIFEST_ADDRESS:get(),
+    "__call_module_function__", module_name, func_name, ...)
+end
+
+local function __getSender()
+  return contract.call(_MANIFEST_ADDRESS:get(), "__get_sender__")
 end
 
 --[[ ============================================================================================================== ]]--
 
 function constructor(manifestAddress)
   __init__(manifestAddress)
-  system.print(MODULE_NAME .. "constructor: manifestAddress=" .. manifestAddress)
+  system.print(MODULE_NAME
+          .. "constructor: manifestAddress=" .. manifestAddress)
 
   -- create Pond metadata table
   --    * is_public = [1=public, 0=permissioned]
   --    * metadata  = [genesis info,]
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_ponds(
-    creator         TEXT NOT NULL,
-    pond_name       TEXT,
-    pond_id         TEXT NOT NULL,
-    is_public       INTEGER DEFAULT 0,
-    pond_block_no   INTEGER DEFAULT NULL,
-    metadata        TEXT,
-    PRIMARY KEY (pond_id)
+  __callFunction(MODULE_NAME_DB, "createTable",
+    [[CREATE TABLE IF NOT EXISTS horde_ponds(
+            creator         TEXT NOT NULL,
+            pond_name       TEXT,
+            pond_id         TEXT NOT NULL,
+            is_public       INTEGER DEFAULT 0,
+            pond_block_no   INTEGER DEFAULT NULL,
+            metadata        TEXT,
+            PRIMARY KEY (pond_id)
   )]])
 
   -- create BNode metadata table
   --    * metadata = [cnode_info,]
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_bnodes(
-    pond_id         TEXT NOT NULL,
-    creator         TEXT NOT NULL,
-    bnode_name      TEXT,
-    bnode_id        TEXT NOT NULL,
-    bnode_block_no  INTEGER DEFAULT NULL,
-    metadata        TEXT,
-    PRIMARY KEY (pond_id, bnode_id),
-    FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
-      ON DELETE CASCADE ON UPDATE NO ACTION
+  __callFunction(MODULE_NAME_DB, "createTable",
+    [[CREATE TABLE IF NOT EXISTS horde_bnodes(
+            pond_id         TEXT NOT NULL,
+            creator         TEXT NOT NULL,
+            bnode_name      TEXT,
+            bnode_id        TEXT NOT NULL,
+            bnode_block_no  INTEGER DEFAULT NULL,
+            metadata        TEXT,
+            PRIMARY KEY (pond_id, bnode_id),
+            FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
+              ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 
   -- create Pond access control table
   --    * ac_detail = [TODO: categorize all object and then designate (CREATE/READ/WRITE/DELETE)]
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_ponds_ac_list(
-    pond_id         TEXT NOT NULL,
-    account_address TEXT NOT NULL,
-    ac_detail       TEXT,
-    PRIMARY KEY (pond_id, account_address)
-    FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
-      ON DELETE CASCADE ON UPDATE NO ACTION
+  __callFunction(MODULE_NAME_DB, "createTable",
+    [[CREATE TABLE IF NOT EXISTS horde_ponds_ac_list(
+            pond_id         TEXT NOT NULL,
+            account_address TEXT NOT NULL,
+            ac_detail       TEXT,
+            PRIMARY KEY (pond_id, account_address)
+            FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
+              ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 end
 
@@ -73,12 +84,16 @@ local function isEmpty(v)
 end
 
 local function generateDposGenesisJson(pond_info)
-  system.print(MODULE_NAME .. "generateDposGenesisJson: pond_info=" .. json:encode(pond_info))
+  system.print(MODULE_NAME
+          .. "generateDposGenesisJson: pond_info=" .. json:encode(pond_info))
 
   local pond_metadata = pond_info['pond_metadata']
-  if nil ~= pond_metadata and nil ~= pond_metadata['genesis_json'] then
-    if pond_metadata['bp_cnt'] == table.getn(pond_metadata['genesis_json']['bps']) then
-      return pond_metadata['genesis_json']
+  local bp_cnt = pond_metadata['bp_cnt']
+  local genesis_json = pond_metadata['genesis_json']
+
+  if nil ~= pond_metadata and nil ~= genesis_json then
+    if bp_cnt == table.getn(genesis_json['bps']) then
+      return genesis_json
     end
   end
 
@@ -91,7 +106,7 @@ local function generateDposGenesisJson(pond_info)
     end
   end
 
-  if pond_metadata['bp_cnt'] <= table.getn(bp_list) then
+  if bp_cnt <= table.getn(bp_list) then
     local genesis = {
       chain_id = {
         version = pond_metadata['pond_version'],
@@ -114,7 +129,7 @@ local function generateDposGenesisJson(pond_info)
     end
 
     -- generate BP list
-    for i = 1, pond_metadata['bp_cnt'] do
+    for i = 1, bp_cnt do
       table.insert(genesis['bps'], bp_list[i]['bnode_metadata']['server_id'])
     end
 
@@ -134,9 +149,10 @@ function createPond(pond_id, pond_name, is_public, metadata)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
-  local creator = system.getSender()
+  local creator = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "createPond: creator=" .. creator .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "createPond: creator=" .. creator
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) then
@@ -163,7 +179,9 @@ function createPond(pond_id, pond_name, is_public, metadata)
     metadata["created_bnode_list"] = nil
     metadata_raw = json:encode(metadata)
   end
-  system.print(MODULE_NAME .. "createPond: created_bnode_list=" .. json:encode(created_bnode_list))
+  system.print(MODULE_NAME
+          .. "createPond: created_bnode_list="
+          .. json:encode(created_bnode_list))
 
   if "404" == res["__status_code"] then
     -- check whether Pond is public
@@ -175,7 +193,13 @@ function createPond(pond_id, pond_name, is_public, metadata)
     end
 
     __callFunction(MODULE_NAME_DB, "insert",
-      "INSERT INTO horde_ponds(creator, pond_name, pond_id, is_public, pond_block_no, metadata) VALUES (?, ?, ?, ?, ?, ?)",
+      [[INSERT INTO horde_ponds(creator,
+                                pond_name,
+                                pond_id,
+                                is_public,
+                                pond_block_no,
+                                metadata)
+               VALUES (?, ?, ?, ?, ?, ?)]],
       creator, pond_name, pond_id, is_public_value, block_no, metadata_raw)
   end
 
@@ -231,9 +255,10 @@ end
 function getPond(pond_id)
   system.print(MODULE_NAME .. "getPond: pond_id=" .. tostring(pond_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getPond: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "getPond: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) then
@@ -251,7 +276,10 @@ function getPond(pond_id)
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    "SELECT creator, pond_name, is_public, metadata, pond_block_no FROM horde_ponds WHERE pond_id = ? ORDER BY pond_block_no", pond_id)
+    [[SELECT creator, pond_name, is_public, metadata, pond_block_no
+        FROM horde_ponds
+        WHERE pond_id = ?
+        ORDER BY pond_block_no]], pond_id)
   local creator
   local pond_name
   local is_public
@@ -275,20 +303,7 @@ function getPond(pond_id)
     exist = true
   end
 
-  -- if not exist, (404 Not Found)
-  if not exist then
-    return {
-      __module = MODULE_NAME,
-      __block_no = block_no,
-      __func_name = "getPond",
-      __status_code = "404",
-      __status_sub_code = "",
-      __err_msg = "cannot find the blockchain (" .. pond_id .. ")",
-      sender = sender,
-      pond_id = pond_id
-    }
-  end
-
+  --[[ TODO: cannot check the sender of a query contract
   -- check permissions (403.2 Read access forbidden)
   if sender ~= creator then
     if not is_public then
@@ -304,6 +319,21 @@ function getPond(pond_id)
         pond_id = pond_id
       }
     end
+  end
+  ]]--
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "getPond",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find the blockchain (" .. pond_id .. ")",
+      sender = sender,
+      pond_id = pond_id
+    }
   end
 
   -- 200 OK
@@ -326,9 +356,10 @@ end
 function deletePond(pond_id)
   system.print(MODULE_NAME .. "deletePond: pond_id=" .. tostring(pond_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "deletePond: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "deletePond: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) then
@@ -369,7 +400,8 @@ function deletePond(pond_id)
   end
 
   -- delete Pond
-  __callFunction(MODULE_NAME_DB, "delete", "DELETE FROM horde_ponds WHERE pond_id = ?", pond_id)
+  __callFunction(MODULE_NAME_DB, "delete",
+    "DELETE FROM horde_ponds WHERE pond_id = ?", pond_id)
 
   -- TODO: save this activity
 
@@ -400,9 +432,10 @@ function updatePond(pond_id, pond_name, is_public, metadata)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updatePond: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "updatePond: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) then
@@ -464,7 +497,8 @@ function updatePond(pond_id, pond_name, is_public, metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "update",
-    "UPDATE horde_ponds SET pond_name = ?, is_public = ?, metadata = ? WHERE pond_id = ?",
+    [[UPDATE horde_ponds SET pond_name = ?, is_public = ?, metadata = ?
+        WHERE pond_id = ?]],
     pond_name, is_public_value, metadata_raw, pond_id)
 
   -- TODO: save this activity
@@ -496,9 +530,10 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
           .. ", bnode_name=" .. tostring(bnode_name)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "createBNode: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "createBNode: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) or isEmpty(bnode_id) then
@@ -543,7 +578,13 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT INTO horde_bnodes(pond_id, creator, bnode_name, bnode_id, bnode_block_no, metadata) VALUES (?, ?, ?, ?, ?, ?)",
+    [[INSERT INTO horde_bnodes(pond_id,
+                               creator,
+                               bnode_name,
+                               bnode_id,
+                               bnode_block_no,
+                               metadata)
+             VALUES (?, ?, ?, ?, ?, ?)]],
     pond_id, sender, bnode_name, bnode_id, block_no, metadata_raw)
 
   -- TODO: save this activity
@@ -577,9 +618,10 @@ end
 function getAllBNodes(pond_id)
   system.print(MODULE_NAME .. "getAllBNodes: pond_id=" .. tostring(pond_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getAllBNodes: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "getAllBNodes: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) then
@@ -672,9 +714,10 @@ function getBNode(pond_id, bnode_id)
   system.print(MODULE_NAME .. "getBNode: pond_id=" .. tostring(pond_id)
           .. ", bnode_id=" .. tostring(bnode_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getBNode: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "getBNode: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) or isEmpty(bnode_id) then
@@ -770,9 +813,10 @@ function deleteBNode(pond_id, bnode_id)
   system.print(MODULE_NAME .. "deleteBNode: pond_id=" .. tostring(pond_id)
           .. ", bnode_id=" .. tostring(bnode_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "deleteBNode: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "deleteBNode: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) or isEmpty(bnode_id) then
@@ -820,7 +864,8 @@ function deleteBNode(pond_id, bnode_id)
 
   -- delete BNode
   __callFunction(MODULE_NAME_DB, "delete",
-    "DELETE FROM horde_bnodes WHERE pond_id = ? AND bnode_id = ?", pond_id, bnode_id)
+    "DELETE FROM horde_bnodes WHERE pond_id = ? AND bnode_id = ?",
+    pond_id, bnode_id)
 
   -- TODO: save this activity
 
@@ -852,9 +897,10 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
           .. ", bnode_name=" .. tostring(bnode_name)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updateBNode: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "updateBNode: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(pond_id) or isEmpty(bnode_id) then
@@ -910,7 +956,8 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "update",
-    "UPDATE horde_bnodes SET bnode_name = ?, metadata = ? WHERE pond_id = ? AND bnode_id = ?",
+    [[UPDATE horde_bnodes SET bnode_name = ?, metadata = ?
+        WHERE pond_id = ? AND bnode_id = ?]],
     bnode_name, metadata_raw, pond_id, bnode_id)
 
   -- TODO: save this activity
@@ -942,4 +989,5 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
 end
 
 -- exposed functions
-abi.register(createPond, getPond, deletePond, updatePond, createBNode, getAllBNodes, getBNode, deleteBNode, updateBNode)
+abi.register(createPond, getPond, deletePond, updatePond,
+  createBNode, getAllBNodes, getBNode, deleteBNode, updateBNode)

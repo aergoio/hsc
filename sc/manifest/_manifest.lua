@@ -8,6 +8,10 @@
 
 MODULE_NAME = "__MANIFEST__"
 
+state.var {
+  _SENDER = state.value(),
+}
+
 local function __init__()
   local scAddress = system.getContractID()
   system.print(MODULE_NAME .. "__init__: sc_address=" .. scAddress)
@@ -27,13 +31,22 @@ local function __getModuleOwner()
 end
 
 local function __callFunction(module_name, func_name, ...)
-  system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name .. ", func_name=" .. func_name)
+  system.print(MODULE_NAME .. "__callFunction: module_name=" .. module_name .. ", func_name=" .. func_name)
 
+  local sender = system.getSender()
+  local module_owner = __getModuleOwner()
+  if sender ~= nil and string.len(sender) ~= 0 then
+    system.setItem(MODULE_NAME .. "__SENDER__", sender)
+    system.print(MODULE_NAME .. "__callFunction: sender(" .. sender .. ") calls owner(" .. module_owner .. ")'s module")
+  end
+
+  --[[
   if __getModuleOwner() ~= system.getSender() then
     system.print(MODULE_NAME .. "__callFunction: WARNING: might not be authorized sender: " .. system.getSender())
     -- TODO: need raise security error
     --return
   end
+  ]]--
 
   return __call_module_function__(module_name, func_name, ...)
 end
@@ -74,8 +87,12 @@ function __call_module_function__(module_name, func_name, ...)
   return contract.call(address, func_name, ...)
 end
 
+function __get_sender__()
+  return system.getItem(MODULE_NAME .. "__SENDER__")
+end
+
 -- internal functions
-abi.register(__init_module__, __call_module_function__)
+abi.register(__init_module__, __call_module_function__, __get_sender__)
 
 --[[ ============================================================================================================== ]]--
 

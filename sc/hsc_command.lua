@@ -18,12 +18,19 @@ local function __init__(manifestAddress)
   _MANIFEST_ADDRESS:set(manifestAddress)
   local scAddress = system.getContractID()
   system.print(MODULE_NAME .. "__init__: sc_address=" .. scAddress)
-  contract.call(_MANIFEST_ADDRESS:get(), "__init_module__", MODULE_NAME, scAddress)
+  contract.call(_MANIFEST_ADDRESS:get(),
+    "__init_module__", MODULE_NAME, scAddress)
 end
 
 local function __callFunction(module_name, func_name, ...)
-  system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name .. ", func_name=" .. func_name)
-  return contract.call(_MANIFEST_ADDRESS:get(), "__call_module_function__", module_name, func_name, ...)
+  system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name
+          .. ", func_name=" .. func_name)
+  return contract.call(_MANIFEST_ADDRESS:get(),
+    "__call_module_function__", module_name, func_name, ...)
+end
+
+local function __getSender()
+  return contract.call(_MANIFEST_ADDRESS:get(), "__get_sender__")
 end
 
 --[[ ============================================================================================================== ]]--
@@ -33,38 +40,41 @@ function constructor(manifestAddress)
   system.print(MODULE_NAME .. "constructor: manifestAddress=" .. manifestAddress)
  
   -- create command table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS commands(
-    cmd_type      TEXT NOT NULL,
-    cmd_id        TEXT PRIMARY KEY,
-    orderer       TEXT NOT NULL,
-    cmd_block_no  INTEGER DEFAULT NULL,
-    cmd_body      TEXT NOT NULL
+  __callFunction(MODULE_NAME_DB, "createTable",
+    [[CREATE TABLE IF NOT EXISTS commands(
+            cmd_type      TEXT NOT NULL,
+            cmd_id        TEXT PRIMARY KEY,
+            orderer       TEXT NOT NULL,
+            cmd_block_no  INTEGER DEFAULT NULL,
+            cmd_body      TEXT NOT NULL
   )]])
  
   -- create command targets table
   --  * status: INIT > EXECUTING > DONE
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS command_targets(
-    cmd_id          TEXT NOT NULL,
-    horde_id        TEXT,
-    cnode_id        TEXT,
-    status          TEXT DEFAULT 'INIT',
-    status_block_no INTEGER DEFAULT NULL,
-    PRIMARY KEY(cmd_id, horde_id, cnode_id),
-    FOREIGN KEY(cmd_id) REFERENCES commands(cmd_id)
-      ON DELETE CASCADE ON UPDATE NO ACTION
+  __callFunction(MODULE_NAME_DB, "createTable",
+    [[CREATE TABLE IF NOT EXISTS command_targets(
+            cmd_id          TEXT NOT NULL,
+            horde_id        TEXT,
+            cnode_id        TEXT,
+            status          TEXT DEFAULT 'INIT',
+            status_block_no INTEGER DEFAULT NULL,
+            PRIMARY KEY(cmd_id, horde_id, cnode_id),
+            FOREIGN KEY(cmd_id) REFERENCES commands(cmd_id)
+              ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
  
   -- create command result table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS command_results(
-    cmd_id          TEXT NOT NULL,
-    horde_id        TEXT,
-    cnode_id        TEXT,
-    result_id       TEXT NOT NULL,
-    result          TEXT NOT NULL,
-    result_block_no INTEGER DEFAULT NULL,
-    PRIMARY KEY(cmd_id, horde_id, cnode_id, result_id),
-    FOREIGN KEY(cmd_id) REFERENCES commands(cmd_id)
-    	ON DELETE CASCADE ON UPDATE NO ACTION
+  __callFunction(MODULE_NAME_DB, "createTable",
+    [[CREATE TABLE IF NOT EXISTS command_results(
+            cmd_id          TEXT NOT NULL,
+            horde_id        TEXT,
+            cnode_id        TEXT,
+            result_id       TEXT NOT NULL,
+            result          TEXT NOT NULL,
+            result_block_no INTEGER DEFAULT NULL,
+            PRIMARY KEY(cmd_id, horde_id, cnode_id, result_id),
+            FOREIGN KEY(cmd_id) REFERENCES commands(cmd_id)
+            	ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 end
 
@@ -85,9 +95,10 @@ function addCommand(cmd_type, cmd_body, target_list)
           .. ", cmd_body=" .. cmd_body_raw
           .. ", target_list=" .. target_list_raw)
 
-  local orderer = system.getSender()
+  local orderer = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "addCommand: orderer=" .. orderer .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "addCommand: orderer=" .. orderer
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_type) then
@@ -111,7 +122,12 @@ function addCommand(cmd_type, cmd_body, target_list)
 
   -- insert a new command
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT INTO commands(cmd_type, cmd_id, orderer, cmd_block_no, cmd_body) VALUES (?, ?, ?, ?, ?)",
+    [[INSERT INTO commands(cmd_type,
+                           cmd_id,
+                           orderer,
+                           cmd_block_no,
+                           cmd_body)
+             VALUES (?, ?, ?, ?, ?)]],
     cmd_type, cmd_id, orderer, block_no, cmd_body_raw)
 
   -- one command to multiple Horde targets
@@ -119,10 +135,16 @@ function addCommand(cmd_type, cmd_body, target_list)
   for _, v in pairs(target_list) do
     local horde_id = v['horde_id']
     local cnode_id = v['cnode_id']
-    system.print(MODULE_NAME .. "addCommand target: horde_id=" .. horde_id .. ", cnode_id=" .. cnode_id)
+    system.print(MODULE_NAME .. "addCommand target: horde_id=" .. horde_id
+            .. ", cnode_id=" .. cnode_id)
 
     __callFunction(MODULE_NAME_DB, "insert",
-      "INSERT INTO command_targets(cmd_id, horde_id, cnode_id, status, status_block_no) VALUES (?, ?, ?, ?, ?)",
+      [[INSERT INTO command_targets(cmd_id,
+                                    horde_id,
+                                    cnode_id,
+                                    status,
+                                    status_block_no)
+               VALUES (?, ?, ?, ?, ?)]],
       cmd_id, horde_id, cnode_id, "INIT", block_no)
 
     exist = true
@@ -153,16 +175,17 @@ end
 function getCommand(cmd_id)
   system.print(MODULE_NAME .. "getCommand: cmd_id=" .. tostring(cmd_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getCommand: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "getCommand: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "addCommand",
+      __func_name = "getCommand",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -173,7 +196,10 @@ function getCommand(cmd_id)
 
   -- check inserted commands
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    "SELECT cmd_type, orderer, cmd_block_no, cmd_body FROM commands WHERE cmd_id = ? ORDER BY cmd_block_no", cmd_id)
+    [[SELECT cmd_type, orderer, cmd_block_no, cmd_body
+        FROM commands
+        WHERE cmd_id = ?
+        ORDER BY cmd_block_no]], cmd_id)
   local cmd_type
   local orderer
   local cmd_block_no
@@ -205,7 +231,10 @@ function getCommand(cmd_id)
 
   local target_list = {}
   rows = __callFunction(MODULE_NAME_DB, "select",
-    "SELECT horde_id, cnode_id, status, status_block_no FROM command_targets WHERE cmd_id = ?", cmd_id)
+    [[SELECT horde_id, cnode_id, status, status_block_no
+        FROM command_targets
+        WHERE cmd_id = ?
+        ORDER BY status_block_no]], cmd_id)
   for _, v in pairs(rows) do
     local target = {
       horde_id = v[1],
@@ -239,9 +268,10 @@ function getCommandOfTarget(horde_id, cnode_id, status)
           .. ", cnode_id=" .. tostring(cnode_id)
           .. ", status=" .. tostring(status))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getCommandOfTarget: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "getCommandOfTarget: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist, (400 Bad Request)
   if isEmpty(horde_id) then
@@ -258,7 +288,9 @@ function getCommandOfTarget(horde_id, cnode_id, status)
     }
   end
 
-  local sql = [[SELECT commands.cmd_type, commands.cmd_id, commands.orderer, commands.cmd_block_no, commands.cmd_body,
+  local sql = [[SELECT commands.cmd_type, commands.cmd_id,
+                        commands.orderer, commands.cmd_block_no,
+                        commands.cmd_body,
                         command_targets.horde_id, command_targets.cnode_id,
                         command_targets.status, command_targets.status_block_no
                   FROM commands INNER JOIN command_targets
@@ -270,7 +302,8 @@ function getCommandOfTarget(horde_id, cnode_id, status)
     if not isEmpty(cnode_id) then
       sql = sql .. " AND command_targets.cnode_id = ?"
     end
-    sql = sql .. ") OR command_targets.horde_id IS NULL) ORDER BY commands.cmd_block_no"
+    sql = sql .. ") OR command_targets.horde_id IS NULL)"
+    sql = sql .. " ORDER BY commands.cmd_block_no"
 
     if isEmpty(cnode_id) then
       rows = __callFunction(MODULE_NAME_DB, "select", sql, horde_id)
@@ -282,12 +315,16 @@ function getCommandOfTarget(horde_id, cnode_id, status)
     if not isEmpty(cnode_id) then
       sql = sql .. " AND command_targets.cnode_id = ?"
     end
-    sql = sql .. ") OR command_targets.horde_id IS NULL) AND command_targets.status = ? ORDER BY commands.cmd_block_no"
+    sql = sql .. ") OR command_targets.horde_id IS NULL)"
+    sql = sql .. " AND command_targets.status = ?"
+    sql = sql .. " ORDER BY commands.cmd_block_no"
 
     if isEmpty(cnode_id) then
-      rows = __callFunction(MODULE_NAME_DB, "select", sql, horde_id, status)
+      rows = __callFunction(MODULE_NAME_DB, "select",
+        sql, horde_id, status)
     else
-      rows = __callFunction(MODULE_NAME_DB, "select", sql, horde_id, cnode_id, status)
+      rows = __callFunction(MODULE_NAME_DB, "select",
+        sql, horde_id, cnode_id, status)
     end
   end
 
@@ -345,9 +382,10 @@ function updateTarget(cmd_id, horde_id, cnode_id, status)
           .. ", cnode_id=" .. tostring(cnode_id)
           .. ", status=" .. tostring(status))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updateTarget: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "updateTarget: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_id) or isEmpty(horde_id) or isEmpty(status) then
@@ -391,7 +429,12 @@ function updateTarget(cmd_id, horde_id, cnode_id, status)
   -- insert or replace
   local block_no = system.getBlockheight()
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT OR REPLACE INTO command_targets (cmd_id, horde_id, cmd_id, status, status_block_no) VALUES (?, ?, ?, ?, ?)",
+    [[INSERT OR REPLACE INTO command_targets (cmd_id,
+                                              horde_id,
+                                              cmd_id,
+                                              status,
+                                              status_block_no)
+                        VALUES (?, ?, ?, ?, ?)]],
     cmd_id, horde_id, cnode_id, status, block_no)
 
   -- 201 Created
@@ -424,9 +467,10 @@ function addCommandResult(cmd_id, horde_id, cnode_id, result)
           .. ", cnode_id=" .. tostring(cnode_id)
           .. ", result=" .. result_raw)
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "addCommandResult: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "addCommandResult: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_id) or isEmpty(horde_id) then
@@ -452,7 +496,8 @@ function addCommandResult(cmd_id, horde_id, cnode_id, result)
     system.print(MODULE_NAME .. "addCommandResult: res=" .. json:encode(res))
     horde_owner = res["horde_owner"]
   else
-    local res = __callFunction(MODULE_NAME_CSPACE, "getCNode", horde_id, cnode_id)
+    local res = __callFunction(MODULE_NAME_CSPACE,
+      "getCNode", horde_id, cnode_id)
     if "200" ~= res["__status_code"] then
       return res
     end
@@ -478,11 +523,18 @@ function addCommandResult(cmd_id, horde_id, cnode_id, result)
   -- tx id is for command id
   local result_id = system.getTxhash()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "addCommandResult: result_id=" .. result_id .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "addCommandResult: result_id=" .. result_id
+          .. ", block_no=" .. block_no)
 
   -- insert command result
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT INTO command_results(cmd_id, horde_id, cnode_id, result_id, result, result_block_no) VALUES (?, ?, ?, ?, ?, ?)",
+    [[INSERT INTO command_results(cmd_id,
+                                  horde_id,
+                                  cnode_id,
+                                  result_id,
+                                  result,
+                                  result_block_no)
+             VALUES (?, ?, ?, ?, ?, ?)]],
     cmd_id, horde_id, cnode_id, result_id, result_raw, block_no)
 
   -- 201 Created
@@ -505,9 +557,10 @@ end
 function getCommandResult(cmd_id)
   system.print(MODULE_NAME .. "getCommandResult: cmd_id=" .. tostring(cmd_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getCommandResult: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "getCommandResult: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(cmd_id) then
@@ -531,6 +584,7 @@ function getCommandResult(cmd_id)
 
   local orderer = res["orderer"]
 
+  --[[ TODO: cannot check the sender of a query contract
   -- check permissions (403.2 Read access forbidden)
   if sender ~= orderer then
     -- TODO: check sender's read result permission of the command
@@ -545,6 +599,7 @@ function getCommandResult(cmd_id)
       cmd_id = cmd_id
     }
   end
+  ]]--
 
   local rows = __callFunction(MODULE_NAME_DB, "select",
     [[SELECT horde_id, cnode_id, result_id, result_block_no, result
@@ -594,4 +649,5 @@ function getCommandResult(cmd_id)
   }
 end
 
-abi.register(addCommand, getCommand, getCommandOfTarget, updateTarget, addCommandResult, getCommandResult)
+abi.register(addCommand, getCommand, getCommandOfTarget, updateTarget,
+  addCommandResult, getCommandResult)

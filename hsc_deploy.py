@@ -228,7 +228,7 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
             out_print("  > ............", k)
 
     # set HSC version
-    if not need_to_change_all or not version_is_same:
+    if need_to_change_all or not version_is_same:
         call_sc(aergo, hsc_address, "setVersion", [deployed_info['hsc_version']])
 
     out_print()

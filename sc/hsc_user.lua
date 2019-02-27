@@ -15,28 +15,37 @@ local function __init__(manifestAddress)
   _MANIFEST_ADDRESS:set(manifestAddress)
   local scAddress = system.getContractID()
   system.print(MODULE_NAME .. "__init__: sc_address=" .. scAddress)
-  contract.call(_MANIFEST_ADDRESS:get(), "__init_module__", MODULE_NAME, scAddress)
+  contract.call(_MANIFEST_ADDRESS:get(),
+    "__init_module__", MODULE_NAME, scAddress)
 end
 
 local function __callFunction(module_name, func_name, ...)
-  system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name .. ", func_name=" .. func_name)
-  return contract.call(_MANIFEST_ADDRESS:get(), "__call_module_function__", module_name, func_name, ...)
+  system.print(MODULE_NAME .. "__callFucntion: module_name=" .. module_name
+          .. ", func_name=" .. func_name)
+  return contract.call(_MANIFEST_ADDRESS:get(),
+    "__call_module_function__", module_name, func_name, ...)
+end
+
+local function __getSender()
+  return contract.call(_MANIFEST_ADDRESS:get(), "__get_sender__")
 end
 
 --[[ ============================================================================================================== ]]--
 
 function constructor(manifestAddress)
   __init__(manifestAddress)
-  system.print(MODULE_NAME .. "constructor: manifestAddress=" .. manifestAddress)
+  system.print(MODULE_NAME
+          .. "constructor: manifestAddress=" .. manifestAddress)
  
   -- create user table
-  __callFunction(MODULE_NAME_DB, "createTable", [[CREATE TABLE IF NOT EXISTS horde_users(
-    user_id         TEXT NOT NULL,
-    user_address    TEXT NOT NULL,
-    create_block_no INTEGER DEFAULT NULL,
-    create_tx_id    TEXT NOT NULL,
-    metadata        TEXT,
-    PRIMARY KEY(user_id, user_address)
+  __callFunction(MODULE_NAME_DB, "createTable",
+    [[CREATE TABLE IF NOT EXISTS horde_users(
+            user_id         TEXT NOT NULL,
+            user_address    TEXT NOT NULL,
+            create_block_no INTEGER DEFAULT NULL,
+            create_tx_id    TEXT NOT NULL,
+            metadata        TEXT,
+            PRIMARY KEY(user_id, user_address)
   )]])
 end
 
@@ -53,12 +62,14 @@ function createUser(user_id, user_address, metadata)
           .. ", user_address=" .. tostring(user_address)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "createUser: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "createUser: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(user_id) then
+  --if isEmpty(user_id) then
+  if isEmpty(user_id) or sender ~= user_address then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
@@ -71,13 +82,27 @@ function createUser(user_id, user_address, metadata)
     }
   end
 
+  -- find a user
+  local res = getUser(user_id)
+  system.print(MODULE_NAME .. "createUser: res=" .. json:encode(res))
+  if "404" ~= res["__status_code"] and "200" ~= res["__status_code"] then
+    return res
+  else
+    return updateUser(user_id, user_address, metadata)
+  end
+
   -- tx id is for command id
   local tx_id = system.getTxhash()
   system.print(MODULE_NAME .. "createUser: tx_id=" .. tx_id)
 
   -- insert a new user
   __callFunction(MODULE_NAME_DB, "insert",
-    "INSERT OR REPLACE INTO horde_users(user_id, user_address, create_block_no, create_tx_id, metadata) VALUES (?, ?, ?, ?, ?)",
+    [[INSERT INTO horde_users(user_id,
+                              user_address,
+                              create_block_no,
+                              create_tx_id,
+                              metadata)
+             VALUES (?, ?, ?, ?, ?)]],
     user_id, user_address, block_no, tx_id, metadata_raw)
 
   -- success to write (201 Created)
@@ -102,9 +127,10 @@ end
 function getUser(user_id)
   system.print(MODULE_NAME .. "getUser: user_id=" .. tostring(user_id))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getUser: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "getUser: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
   if isEmpty(user_id) then
@@ -148,6 +174,7 @@ function getUser(user_id)
     exist = true
   end
 
+  --[[ TODO: cannot check the sender of a query contract
   -- check permissions (403.2 Read access forbidden)
   if allowed then
     return {
@@ -161,6 +188,7 @@ function getUser(user_id)
       user_id = user_id
     }
   end
+  ]]--
 
   -- if not exist, (404 Not Found)
   if not exist then
@@ -192,11 +220,13 @@ function deleteUser(user_id, user_address)
   system.print(MODULE_NAME .. "deleteUser: user_id=" .. tostring(user_id)
           .. ", user_address=" .. tostring(user_address))
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "deleteUser: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "deleteUser: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
+  --if isEmpty(user_id) then
   if isEmpty(user_id) or sender ~= user_address then
     return {
       __module = MODULE_NAME,
@@ -228,10 +258,10 @@ function deleteUser(user_id, user_address)
 
   -- read created user info
   local res = getUser(user_id)
+  system.print(MODULE_NAME .. "deleteUser: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "deleteUser: res=" .. json:encode(res))
 
   local user_info = nil
   for _, info in pairs(res['user_info_list']) do
@@ -248,7 +278,8 @@ function deleteUser(user_id, user_address)
       __func_name = "deleteUser",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find the user (" .. user_id .. ", " .. user_address .. ")",
+      __err_msg = "cannot find the user (" .. user_id .. ", "
+              .. user_address .. ")",
       sender = sender,
       user_id = user_id,
       user_address = user_address,
@@ -256,7 +287,8 @@ function deleteUser(user_id, user_address)
   end
 
   -- delete Pond
-  __callFunction(MODULE_NAME_DB, "delete", "DELETE FROM horde_users WHERE user_id = ?", user_id)
+  __callFunction(MODULE_NAME_DB, "delete",
+    "DELETE FROM horde_users WHERE user_id = ?", user_id)
 
   -- TODO: save this activity
 
@@ -289,12 +321,14 @@ function updateUser(user_id, user_address, metadata)
           .. ", user_address=" .. tostring(user_address)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = system.getSender()
+  local sender = __getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updateUser: sender=" .. sender .. ", block_no=" .. block_no)
+  system.print(MODULE_NAME .. "updateUser: sender=" .. sender
+          .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(user_id) or sender ~= user_address then
+  --if isEmpty(user_id) or sender ~= user_address then
+  if isEmpty(user_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
@@ -325,10 +359,10 @@ function updateUser(user_id, user_address, metadata)
 
   -- read created user info
   local res = getUser(user_id)
+  system.print(MODULE_NAME .. "updateUser: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "updateUser: res=" .. json:encode(res))
 
   local user_info = nil
   for _, info in pairs(res['user_info_list']) do
@@ -345,7 +379,8 @@ function updateUser(user_id, user_address, metadata)
       __func_name = "updateUser",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find the user (" .. user_id .. ", " .. user_address .. ")",
+      __err_msg = "cannot find the user (" .. user_id .. ", "
+              .. user_address .. ")",
       sender = sender,
       user_id = user_id,
       user_address = user_address,
@@ -355,7 +390,8 @@ function updateUser(user_id, user_address, metadata)
   -- update
   local block_no = system.getBlockheight()
   __callFunction(MODULE_NAME_DB, "update",
-    "UPDATE horde_users SET metadata = ? WHERE user_id = ? AND user_address = ?",
+    [[UPDATE horde_users SET metadata = ?
+        WHERE user_id = ? AND user_address = ?]],
     metadata_raw, user_id, user_address)
 
   -- TODO: save this activity
