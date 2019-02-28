@@ -336,6 +336,7 @@ function getAllPonds(creator)
     pond_list = {}
   elseif "200" == res["__status_code"] then
     pond_list = res["pond_list"]
+    exist = true
   else
     return res
   end

@@ -252,6 +252,7 @@ function getAllHordes(owner)
     horde_list = {}
   elseif "200" == res["__status_code"] then
     horde_list = res["horde_list"]
+    exist = true
   else
     return res
   end
