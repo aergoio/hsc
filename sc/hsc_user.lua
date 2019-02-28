@@ -85,10 +85,10 @@ function createUser(user_id, user_address, metadata)
   -- find a user
   local res = getUser(user_id)
   system.print(MODULE_NAME .. "createUser: res=" .. json:encode(res))
-  if "404" ~= res["__status_code"] and "200" ~= res["__status_code"] then
-    return res
-  else
+  if "200" == res["__status_code"] then
     return updateUser(user_id, user_address, metadata)
+  elseif "404" ~= res["__status_code"] then
+    return res
   end
 
   -- tx id is for command id
