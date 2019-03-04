@@ -110,9 +110,9 @@ local function generateDposGenesisJson(pond_info)
     local genesis = {
       chain_id = {
         version = pond_metadata['pond_version'],
-        magic = pond_info['pond_id'],
+        magic = pond_info['pond_name'],
         public = pond_info['is_public'],
-        mainnet = false,
+        mainnet = pond_metadata['is_mainnet'],
         consensus = 'dpos',
         coinbasefee = pond_metadata['coinbase_fee']
       },

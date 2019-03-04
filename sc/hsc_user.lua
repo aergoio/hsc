@@ -366,7 +366,7 @@ function updateUser(user_id, user_address, metadata)
 
   local user_info = nil
   for _, info in pairs(res['user_info_list']) do
-    if user_info['user_address'] == user_address then
+    if info['user_address'] == user_address then
       user_info = info
     end
   end
