@@ -26,10 +26,6 @@ local function __callFunction(module_name, func_name, ...)
     "__call_module_function__", module_name, func_name, ...)
 end
 
-local function __getSender()
-  return contract.call(_MANIFEST_ADDRESS:get(), "__get_sender__")
-end
-
 --[[ ============================================================================================================== ]]--
 
 function constructor(manifestAddress)
@@ -149,7 +145,7 @@ function createPond(pond_id, pond_name, is_public, metadata)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
-  local creator = __getSender()
+  local creator = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "createPond: creator=" .. creator
           .. ", block_no=" .. block_no)
@@ -290,7 +286,7 @@ function getPublicPonds()
     exist = true
   end
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getPublicPonds: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -341,7 +337,7 @@ function getAllPonds(creator)
     return res
   end
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getAllPonds: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -410,7 +406,7 @@ end
 function getPond(pond_id)
   system.print(MODULE_NAME .. "getPond: pond_id=" .. tostring(pond_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getPond: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -511,7 +507,7 @@ end
 function deletePond(pond_id)
   system.print(MODULE_NAME .. "deletePond: pond_id=" .. tostring(pond_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "deletePond: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -587,7 +583,7 @@ function updatePond(pond_id, pond_name, is_public, metadata)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "updatePond: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -685,7 +681,7 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
           .. ", bnode_name=" .. tostring(bnode_name)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "createBNode: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -773,7 +769,7 @@ end
 function getAllBNodes(pond_id)
   system.print(MODULE_NAME .. "getAllBNodes: pond_id=" .. tostring(pond_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getAllBNodes: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -869,7 +865,7 @@ function getBNode(pond_id, bnode_id)
   system.print(MODULE_NAME .. "getBNode: pond_id=" .. tostring(pond_id)
           .. ", bnode_id=" .. tostring(bnode_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getBNode: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -968,7 +964,7 @@ function deleteBNode(pond_id, bnode_id)
   system.print(MODULE_NAME .. "deleteBNode: pond_id=" .. tostring(pond_id)
           .. ", bnode_id=" .. tostring(bnode_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "deleteBNode: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -1052,7 +1048,7 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
           .. ", bnode_name=" .. tostring(bnode_name)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "updateBNode: sender=" .. sender
           .. ", block_no=" .. block_no)

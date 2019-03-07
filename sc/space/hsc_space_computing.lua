@@ -26,10 +26,6 @@ local function __callFunction(module_name, func_name, ...)
     "__call_module_function__", module_name, func_name, ...)
 end
 
-local function __getSender()
-  return contract.call(_MANIFEST_ADDRESS:get(), "__get_sender__")
-end
-
 --[[ ============================================================================================================== ]]--
 
 function constructor(manifestAddress)
@@ -89,7 +85,7 @@ function addHorde(horde_id, horde_name, is_public, metadata)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "addHorde: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -206,7 +202,7 @@ function getPublicHordes()
     exist = true
   end
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getPublicHordes: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -257,7 +253,7 @@ function getAllHordes(owner)
     return res
   end
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getAllHordes: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -345,7 +341,7 @@ end
 function getHorde(horde_id)
   system.print(MODULE_NAME .. "getHorde: horde_id=" .. tostring(horde_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getHorde: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -447,7 +443,7 @@ end
 function dropHorde(horde_id)
   system.print(MODULE_NAME .. "dropHorde: horde_id=" .. tostring(horde_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "dropHorde: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -523,7 +519,7 @@ function updateHorde(horde_id, horde_name, is_public, metadata)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "updateHorde: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -621,7 +617,7 @@ function addCNode(horde_id, cnode_id, cnode_name, metadata)
           .. ", cnode_name=" .. tostring(cnode_name)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "addCNode: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -706,7 +702,7 @@ end
 function getAllCNodes(horde_id)
   system.print(MODULE_NAME .. "getAllCNodes: horde_id=" .. tostring(horde_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getAllCNodes: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -803,7 +799,7 @@ function getCNode(horde_id, cnode_id)
   system.print(MODULE_NAME .. "getCNode: horde_id=" .. tostring(horde_id)
           .. ", cnode_id=" .. tostring(cnode_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getCNode: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -902,7 +898,7 @@ function dropCNode(horde_id, cnode_id)
   system.print(MODULE_NAME .. "dropCNode: horde_id=" .. tostring(horde_id)
           .. ", cnode_id=" .. tostring(cnode_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "dropCNode: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -986,7 +982,7 @@ function updateCNode(horde_id, cnode_id, cnode_name, metadata)
           .. ", cnode_name=" .. tostring(cnode_name)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "updateCNode: sender=" .. sender .. ", block_no=" .. block_no)
 

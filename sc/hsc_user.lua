@@ -26,10 +26,6 @@ local function __callFunction(module_name, func_name, ...)
     "__call_module_function__", module_name, func_name, ...)
 end
 
-local function __getSender()
-  return contract.call(_MANIFEST_ADDRESS:get(), "__get_sender__")
-end
-
 --[[ ============================================================================================================== ]]--
 
 function constructor(manifestAddress)
@@ -62,7 +58,7 @@ function createUser(user_id, user_address, metadata)
           .. ", user_address=" .. tostring(user_address)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "createUser: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -127,7 +123,7 @@ end
 function getUser(user_id)
   system.print(MODULE_NAME .. "getUser: user_id=" .. tostring(user_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getUser: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -220,7 +216,7 @@ function deleteUser(user_id, user_address)
   system.print(MODULE_NAME .. "deleteUser: user_id=" .. tostring(user_id)
           .. ", user_address=" .. tostring(user_address))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "deleteUser: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -321,7 +317,7 @@ function updateUser(user_id, user_address, metadata)
           .. ", user_address=" .. tostring(user_address)
           .. ", metadata=" .. metadata_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "updateUser: sender=" .. sender
           .. ", block_no=" .. block_no)

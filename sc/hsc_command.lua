@@ -29,10 +29,6 @@ local function __callFunction(module_name, func_name, ...)
     "__call_module_function__", module_name, func_name, ...)
 end
 
-local function __getSender()
-  return contract.call(_MANIFEST_ADDRESS:get(), "__get_sender__")
-end
-
 --[[ ============================================================================================================== ]]--
 
 function constructor(manifestAddress)
@@ -95,7 +91,7 @@ function addCommand(cmd_type, cmd_body, target_list)
           .. ", cmd_body=" .. cmd_body_raw
           .. ", target_list=" .. target_list_raw)
 
-  local orderer = __getSender()
+  local orderer = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "addCommand: orderer=" .. orderer
           .. ", block_no=" .. block_no)
@@ -175,7 +171,7 @@ end
 function getCommand(cmd_id)
   system.print(MODULE_NAME .. "getCommand: cmd_id=" .. tostring(cmd_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getCommand: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -268,7 +264,7 @@ function getCommandOfTarget(horde_id, cnode_id, status)
           .. ", cnode_id=" .. tostring(cnode_id)
           .. ", status=" .. tostring(status))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getCommandOfTarget: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
@@ -382,7 +378,7 @@ function updateTarget(cmd_id, horde_id, cnode_id, status)
           .. ", cnode_id=" .. tostring(cnode_id)
           .. ", status=" .. tostring(status))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "updateTarget: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -467,7 +463,7 @@ function addCommandResult(cmd_id, horde_id, cnode_id, result)
           .. ", cnode_id=" .. tostring(cnode_id)
           .. ", result=" .. result_raw)
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "addCommandResult: sender=" .. sender
           .. ", block_no=" .. block_no)
@@ -557,7 +553,7 @@ end
 function getCommandResult(cmd_id)
   system.print(MODULE_NAME .. "getCommandResult: cmd_id=" .. tostring(cmd_id))
 
-  local sender = __getSender()
+  local sender = system.getOrigin()
   local block_no = system.getBlockheight()
   system.print(MODULE_NAME .. "getCommandResult: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
