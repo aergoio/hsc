@@ -87,7 +87,7 @@ function createUser(user_id, user_address, metadata)
     return res
   end
 
-  -- tx id is for command id
+  -- tx id
   local tx_id = system.getTxhash()
   system.print(MODULE_NAME .. "createUser: tx_id=" .. tx_id)
 

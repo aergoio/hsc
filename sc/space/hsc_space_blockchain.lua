@@ -43,6 +43,7 @@ function constructor(manifestAddress)
             pond_id         TEXT NOT NULL,
             is_public       INTEGER DEFAULT 0,
             pond_block_no   INTEGER DEFAULT NULL,
+            pond_tx_id      TEXT NOT NULL,
             metadata        TEXT,
             PRIMARY KEY (pond_id)
   )]])
@@ -56,6 +57,7 @@ function constructor(manifestAddress)
             bnode_name      TEXT,
             bnode_id        TEXT NOT NULL,
             bnode_block_no  INTEGER DEFAULT NULL,
+            bnode_tx_id     TEXT NOT NULL,
             metadata        TEXT,
             PRIMARY KEY (pond_id, bnode_id),
             FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
@@ -177,15 +179,21 @@ function createPond(pond_id, pond_name, is_public, metadata)
       is_public_value = 0
     end
 
+    -- tx id
+    local tx_id = system.getTxhash()
+    system.print(MODULE_NAME .. "createPond: tx_id=" .. tx_id)
+
     __callFunction(MODULE_NAME_DB, "insert",
       [[INSERT INTO horde_ponds(creator,
                                 pond_name,
                                 pond_id,
                                 is_public,
                                 pond_block_no,
+                                pond_tx_id,
                                 metadata)
-               VALUES (?, ?, ?, ?, ?, ?)]],
-      creator, pond_name, pond_id, is_public_value, block_no, metadata_raw)
+               VALUES (?, ?, ?, ?, ?, ?, ?)]],
+      creator, pond_name, pond_id, is_public_value,
+      block_no, tx_id, metadata_raw)
   end
 
   local created_bnode_list = metadata['created_bnode_list']
@@ -242,6 +250,7 @@ function createPond(pond_id, pond_name, is_public, metadata)
     pond_name = res['pond_name'],
     pond_metadata = pond_metadata,
     pond_block_no = res['pond_block_no'],
+    pond_tx_id = res['pond_tx_id'],
     is_public = res['is_public'],
     bnode_list = res['bnode_list'],
   }
@@ -255,7 +264,8 @@ function getPublicPonds()
 
   -- check all public Ponds
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT pond_id, pond_name, creator, metadata, pond_block_no
+    [[SELECT pond_id, pond_name, creator, metadata,
+              pond_block_no, pond_tx_id
         FROM horde_ponds
         WHERE is_public = 1
         ORDER BY pond_block_no]])
@@ -278,6 +288,7 @@ function getPublicPonds()
       pond_creator = v[3],
       pond_metadata = json:decode(v[4]),
       pond_block_no = v[5],
+      pond_tx_id = v[6],
       is_public = true,
       bnode_list = bnode_list,
     }
@@ -344,7 +355,8 @@ function getAllPonds(creator)
 
   -- check all creator's private Ponds
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT pond_id, pond_name, metadata, pond_block_no
+    [[SELECT pond_id, pond_name, metadata,
+              pond_block_no, pond_tx_id
         FROM horde_ponds
         WHERE creator= ? AND is_public = 0
         ORDER BY pond_block_no]],
@@ -369,6 +381,7 @@ function getAllPonds(creator)
       pond_name = v[2],
       pond_metadata = json:decode(v[3]),
       pond_block_no = v[4],
+      pond_tx_id = v[5],
       is_public = false,
       bnode_list = bnode_list,
     }
@@ -427,7 +440,8 @@ function getPond(pond_id)
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT creator, pond_name, is_public, metadata, pond_block_no
+    [[SELECT creator, pond_name, is_public, metadata,
+              pond_block_no, pond_tx_id
         FROM horde_ponds
         WHERE pond_id = ?
         ORDER BY pond_block_no]], pond_id)
@@ -436,6 +450,7 @@ function getPond(pond_id)
   local is_public
   local metadata
   local pond_block_no
+  local pond_tx_id
 
   local exist = false
   for _, v in pairs(rows) do
@@ -450,6 +465,7 @@ function getPond(pond_id)
 
     metadata = json:decode(v[4])
     pond_block_no = v[5]
+    pond_tx_id = v[6]
 
     exist = true
   end
@@ -500,6 +516,7 @@ function getPond(pond_id)
     pond_name = pond_name,
     pond_metadata = metadata,
     pond_block_no = pond_block_no,
+    pond_tx_id = pond_tx_id,
     is_public = is_public
   }
 end
@@ -569,6 +586,7 @@ function deletePond(pond_id)
     pond_name = res['pond_name'],
     pond_metadata = res['pond_metadata'],
     pond_block_no = res['pond_block_no'],
+    pond_tx_id = res['pond_tx_id'],
     is_public = res['is_public']
   }
 end
@@ -667,6 +685,7 @@ function updatePond(pond_id, pond_name, is_public, metadata)
     pond_name = pond_name,
     pond_metadata = metadata,
     pond_block_no = res['pond_block_no'],
+    pond_tx_id = res['pond_tx_id'],
     is_public = is_public
   }
 end
@@ -728,15 +747,21 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
     end
   end
 
+  -- tx id
+  local tx_id = system.getTxhash()
+  system.print(MODULE_NAME .. "createBNode: tx_id=" .. tx_id)
+
   __callFunction(MODULE_NAME_DB, "insert",
     [[INSERT INTO horde_bnodes(pond_id,
                                creator,
                                bnode_name,
                                bnode_id,
                                bnode_block_no,
+                               bnode_tx_id,
                                metadata)
-             VALUES (?, ?, ?, ?, ?, ?)]],
-    pond_id, sender, bnode_name, bnode_id, block_no, metadata_raw)
+             VALUES (?, ?, ?, ?, ?, ?, ?)]],
+    pond_id, sender, bnode_name, bnode_id,
+    block_no, tx_id, metadata_raw)
 
   -- TODO: save this activity
 
@@ -753,6 +778,7 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
     pond_name = res['pond_name'],
     pond_metadata = res['pond_metadata'],
     pond_block_no = res['pond_block_no'],
+    pond_tx_id = res['pond_tx_id'],
     is_public = is_public,
     bnode_list = {
       {
@@ -760,7 +786,8 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
         bnode_name = bnode_name,
         bnode_id = bnode_id,
         bnode_metadata = metadata,
-        bnode_block_no = block_no
+        bnode_block_no = block_no,
+        bnode_tx_id = tx_id
       }
     }
   }
@@ -800,10 +827,12 @@ function getAllBNodes(pond_id)
   local is_public = res["is_public"]
   local pond_metadata = res["pond_metadata"]
   local pond_block_no = res["pond_block_no"]
+  local pond_tx_id = res['pond_tx_id']
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT creator, bnode_id, bnode_name, metadata, bnode_block_no
+    [[SELECT creator, bnode_id, bnode_name, metadata,
+              bnode_block_no, bnode_tx_id
         FROM horde_bnodes
         WHERE pond_id = ? ORDER BY bnode_block_no]],
     pond_id)
@@ -817,7 +846,8 @@ function getAllBNodes(pond_id)
       bnode_id = v[2],
       bnode_name = v[3],
       bnode_metadata = json:decode(v[4]),
-      bnode_block_no = v[5]
+      bnode_block_no = v[5],
+      bnode_tx_id = v[6]
     }
     table.insert(bnode_list, bnode)
 
@@ -839,6 +869,7 @@ function getAllBNodes(pond_id)
       pond_name = pond_name,
       pond_metadata = pond_metadata,
       pond_block_no = pond_block_no,
+      pond_tx_id = pond_tx_id,
       is_public = is_public
     }
   end
@@ -856,6 +887,7 @@ function getAllBNodes(pond_id)
     pond_name = pond_name,
     pond_metadata = pond_metadata,
     pond_block_no = pond_block_no,
+    pond_tx_id = pond_tx_id,
     is_public = is_public,
     bnode_list = bnode_list
   }
@@ -897,10 +929,12 @@ function getBNode(pond_id, bnode_id)
   local is_public = res["is_public"]
   local pond_metadata = res["pond_metadata"]
   local pond_block_no = res["pond_block_no"]
+  local pond_tx_id = res['pond_tx_id']
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT creator, bnode_name, metadata, bnode_block_no
+    [[SELECT creator, bnode_name, metadata,
+              bnode_block_no, bnode_tx_id
         FROM horde_bnodes
         WHERE pond_id = ? AND bnode_id = ?
         ORDER BY bnode_block_no]],
@@ -915,7 +949,8 @@ function getBNode(pond_id, bnode_id)
       bnode_creator = v[1],
       bnode_name = v[2],
       bnode_metadata = json:decode(v[3]),
-      bnode_block_no = v[4]
+      bnode_block_no = v[4],
+      bnode_tx_id = v[5]
     }
     table.insert(bnode_list, bnode)
 
@@ -937,6 +972,7 @@ function getBNode(pond_id, bnode_id)
       pond_name = pond_name,
       pond_metadata = pond_metadata,
       pond_block_no = pond_block_no,
+      pond_tx_id = pond_tx_id,
       is_public = is_public,
       bnode_id = bnode_id
     }
@@ -955,6 +991,7 @@ function getBNode(pond_id, bnode_id)
     pond_name = pond_name,
     pond_metadata = pond_metadata,
     pond_block_no = pond_block_no,
+    pond_tx_id = pond_tx_id,
     is_public = is_public,
     bnode_list = bnode_list
   }
@@ -1033,6 +1070,7 @@ function deleteBNode(pond_id, bnode_id)
     pond_name = res["pond_name"],
     pond_metadata = res["pond_metadata"],
     pond_block_no = res['pond_block_no'],
+    pond_tx_id = res['pond_tx_id'],
     is_public = res["is_public"],
     bnode_list = res["bnode_list"]
   }
@@ -1126,6 +1164,7 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
     pond_name = res["pond_name"],
     pond_metadata = res["pond_metadata"],
     pond_block_no = res['pond_block_no'],
+    pond_tx_id = res['pond_tx_id'],
     is_public = res["is_public"],
     bnode_list = {
       {
@@ -1133,7 +1172,8 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
         bnode_name = bnode_name,
         bnode_id = bnode_id,
         bnode_metadata = metadata,
-        bnode_block_no = bnode_info['bnode_block_no']
+        bnode_block_no = bnode_info['bnode_block_no'],
+        bnode_tx_id = bnode_info['bnode_tx_id']
       }
     }
   }

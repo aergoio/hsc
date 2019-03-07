@@ -40,6 +40,7 @@ function constructor(manifestAddress)
             horde_id        TEXT NOT NULL,
             is_public       INTEGER DEFAULT 0,
             horde_block_no  INTEGER DEFAULT NULL,
+            horde_tx_id     TEXT NOT NULL,
             metadata        TEXT,
             PRIMARY KEY (horde_id)
   )]])
@@ -52,6 +53,7 @@ function constructor(manifestAddress)
             cnode_name      TEXT,
             cnode_id        TEXT NOT NULL,
             cnode_block_no  INTEGER DEFAULT NULL,
+            cnode_tx_id     TEXT NOT NULL,
             metadata        TEXT,
             PRIMARY KEY(horde_id, cnode_id),
             FOREIGN KEY(horde_id) REFERENCES hordes(horde_id)
@@ -117,19 +119,35 @@ function addHorde(horde_id, horde_name, is_public, metadata)
       is_public_value = 0
     end
 
+    -- tx id
+    local tx_id = system.getTxhash()
+    system.print(MODULE_NAME .. "addHorde: tx_id=" .. tx_id)
+
     __callFunction(MODULE_NAME_DB, "insert",
       [[INSERT INTO hordes(horde_owner,
                            horde_name,
                            horde_id,
                            is_public,
                            horde_block_no,
+                           horde_tx_id,
                            metadata)
-               VALUES (?, ?, ?, ?, ?, ?)]],
-      sender, horde_name, horde_id, is_public, block_no, metadata_raw)
+               VALUES (?, ?, ?, ?, ?, ?, ?)]],
+      sender, horde_name, horde_id, is_public,
+      block_no, tx_id, metadata_raw)
   end
 
+  local added_cnode_list = metadata['added_cnode_list']
+  if nil == added_cnode_list then
+    added_cnode_list = {}
+  else
+    metadata["added_cnode_list"] = nil
+  end
+  system.print(MODULE_NAME
+          .. "addHorde: added_cnode_list="
+          .. json:encode(added_cnode_list))
+
   -- check the CNode info from Horde
-  for _, cnode in pairs(metadata['cnode_list']) do
+  for _, cnode in pairs(added_cnode_list) do
     local cnode_id = cnode['cnode_id']
     local cnode_name = cnode['cnode_name']
     local cnode_metadata = cnode['cnode_metadata']
@@ -158,6 +176,7 @@ function addHorde(horde_id, horde_name, is_public, metadata)
     horde_name = res['horde_name'],
     horde_metadata = res['horde_metadata'],
     horde_block_no = res['horde_block_no'],
+    horde_tx_id = res['horde_tx_id'],
     is_public = res['is_public'],
     cnode_list = res['cnode_list'],
   }
@@ -171,7 +190,8 @@ function getPublicHordes()
 
   -- check all public Hordes
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT horde_id, horde_owner, horde_name, metadata, horde_block_no
+    [[SELECT horde_id, horde_owner, horde_name, metadata,
+              horde_block_no, horde_tx_id
         FROM hordes
         WHERE is_public = 1
         ORDER BY horde_block_no]])
@@ -194,6 +214,7 @@ function getPublicHordes()
       horde_name = v[3],
       horde_metadata = json:decode(v[4]),
       horde_block_no = v[5],
+      horde_tx_id = v[6],
       is_public = true,
       cnode_list = cnode_list,
     }
@@ -260,7 +281,8 @@ function getAllHordes(owner)
 
   -- check all owner's private Hordes
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT horde_id, horde_name, metadata, horde_block_no
+    [[SELECT horde_id, horde_name, metadata,
+              horde_block_no, horde_tx_id
         FROM hordes
         WHERE horde_owner = ? AND is_public = 0
         ORDER BY horde_block_no]],
@@ -285,6 +307,7 @@ function getAllHordes(owner)
       horde_name = v[2],
       horde_metadata = json:decode(v[3]),
       horde_block_no = v[4],
+      horde_tx_id = v[5],
       is_public = false,
       cnode_list = cnode_list,
     }
@@ -362,7 +385,8 @@ function getHorde(horde_id)
 
   -- check registered Horde
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT horde_owner, horde_name, is_public, metadata, horde_block_no
+    [[SELECT horde_owner, horde_name, is_public, metadata,
+              horde_block_no, horde_tx_id
         FROM hordes
         WHERE horde_id = ?
         ORDER BY horde_block_no]],
@@ -372,6 +396,7 @@ function getHorde(horde_id)
   local is_public
   local metadata
   local horde_block_no
+  local horde_tx_id
 
   local exist = false
   for _, v in pairs(rows) do
@@ -386,6 +411,7 @@ function getHorde(horde_id)
 
     metadata = json:decode(v[4])
     horde_block_no = v[5]
+    horde_tx_id = v[6]
 
     exist = true
   end
@@ -436,6 +462,7 @@ function getHorde(horde_id)
     horde_name = horde_name,
     horde_metadata = metadata,
     horde_block_no = horde_block_no,
+    horde_tx_id = horde_tx_id,
     is_public = is_public
   }
 end
@@ -505,6 +532,7 @@ function dropHorde(horde_id)
     horde_name = res['horde_name'],
     horde_metadata = res['horde_metadata'],
     horde_block_no = res['horde_block_no'],
+    horde_tx_id = res['horde_tx_id'],
     is_public = res['is_public']
   }
 end
@@ -603,6 +631,7 @@ function updateHorde(horde_id, horde_name, is_public, metadata)
     horde_name = horde_name,
     horde_metadata = metadata,
     horde_block_no = res['horde_block_no'],
+    horde_tx_id = res['horde_tx_id'],
     is_public = is_public
   }
 end
@@ -661,15 +690,21 @@ function addCNode(horde_id, cnode_id, cnode_name, metadata)
     }
   end
 
+  -- tx id
+  local tx_id = system.getTxhash()
+  system.print(MODULE_NAME .. "addCNode: tx_id=" .. tx_id)
+
   __callFunction(MODULE_NAME_DB, "insert",
     [[INSERT OR REPLACE INTO horde_cnodes(horde_id,
                                           cnode_owner,
                                           cnode_name,
                                           cnode_id,
                                           cnode_block_no,
+                                          cnode_tx_id,
                                           metadata)
-             VALUES (?, ?, ?, ?, ?, ?)]],
-    horde_id, sender, cnode_name, cnode_id, block_no, metadata_raw)
+             VALUES (?, ?, ?, ?, ?, ?, ?)]],
+    horde_id, sender, cnode_name, cnode_id,
+    block_no, tx_id, metadata_raw)
 
   -- TODO: save this activity
 
@@ -686,6 +721,7 @@ function addCNode(horde_id, cnode_id, cnode_name, metadata)
     horde_name = res['horde_name'],
     horde_metadata = res['horde_metadata'],
     horde_block_no = res['horde_block_no'],
+    horde_tx_id = res['horde_tx_id'],
     is_public = res['is_public'],
     cnode_list = {
       {
@@ -693,7 +729,8 @@ function addCNode(horde_id, cnode_id, cnode_name, metadata)
         cnode_name = cnode_name,
         cnode_id = cnode_id,
         cnode_metadata = metadata,
-        cnode_block_no = block_no
+        cnode_block_no = block_no,
+        cnode_tx_id = tx_id
       }
     }
   }
@@ -733,10 +770,12 @@ function getAllCNodes(horde_id)
   local is_public = res["is_public"]
   local horde_metadata = res["horde_metadata"]
   local horde_block_no = res["horde_block_no"]
+  local horde_tx_id = res['horde_tx_id']
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT cnode_owner, cnode_id, cnode_name, metadata, cnode_block_no
+    [[SELECT cnode_owner, cnode_id, cnode_name, metadata,
+              cnode_block_no, cnode_tx_id
         FROM horde_cnodes
         WHERE horde_id = ?
         ORDER BY cnode_block_no]],
@@ -751,7 +790,8 @@ function getAllCNodes(horde_id)
       cnode_id = v[2],
       cnode_name = v[3],
       cnode_metadata = json:decode(v[4]),
-      cnode_block_no = v[5]
+      cnode_block_no = v[5],
+      cnode_tx_id = v[6]
     }
     table.insert(cnode_list, cnode)
 
@@ -773,6 +813,7 @@ function getAllCNodes(horde_id)
       horde_name = horde_name,
       horde_metadata = horde_metadata,
       horde_block_no = horde_block_no,
+      horde_tx_id = horde_tx_id,
       is_public = is_public
     }
   end
@@ -790,6 +831,7 @@ function getAllCNodes(horde_id)
     horde_name = horde_name,
     horde_metadata = horde_metadata,
     horde_block_no = horde_block_no,
+    horde_tx_id = horde_tx_id,
     is_public = is_public,
     cnode_list = cnode_list
   }
@@ -831,10 +873,12 @@ function getCNode(horde_id, cnode_id)
   local is_public = res["is_public"]
   local horde_metadata = res["horde_metadata"]
   local horde_block_no = res["horde_block_no"]
+  local horde_tx_id = res['horde_tx_id']
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT cnode_owner, cnode_name, metadata, cnode_block_no
+    [[SELECT cnode_owner, cnode_name, metadata,
+              cnode_block_no, cnode_tx_id
         FROM horde_cnodes
         WHERE horde_id = ? AND cnode_id = ?
         ORDER BY cnode_block_no]],
@@ -849,7 +893,8 @@ function getCNode(horde_id, cnode_id)
       cnode_owner = v[1],
       cnode_name = v[2],
       cnode_metadata = json:decode(v[3]),
-      cnode_block_no = v[4]
+      cnode_block_no = v[4],
+      cnode_tx_id = v[5]
     }
     table.insert(cnode_list, cnode)
 
@@ -871,6 +916,7 @@ function getCNode(horde_id, cnode_id)
       horde_name = horde_name,
       horde_metadata = horde_metadata,
       horde_block_no = horde_block_no,
+      horde_tx_id = horde_tx_id,
       is_public = is_public,
       cnode_id = cnode_id
     }
@@ -889,6 +935,7 @@ function getCNode(horde_id, cnode_id)
     horde_name = horde_name,
     horde_metadata = horde_metadata,
     horde_block_no = horde_block_no,
+    horde_tx_id = horde_tx_id,
     is_public = is_public,
     cnode_list = cnode_list
   }
@@ -967,6 +1014,7 @@ function dropCNode(horde_id, cnode_id)
     horde_name = res["horde_name"],
     horde_metadata = res["horde_metadata"],
     horde_block_no = res["horde_block_no"],
+    horde_tx_id = res['horde_tx_id'],
     is_public = res["is_public"],
     cnode_list = res["cnode_list"]
   }
@@ -1059,6 +1107,7 @@ function updateCNode(horde_id, cnode_id, cnode_name, metadata)
     horde_name = res["horde_name"],
     horde_metadata = res["horde_metadata"],
     horde_block_no = res["horde_block_no"],
+    horde_tx_id = res['horde_tx_id'],
     is_public = res["is_public"],
     cnode_list = {
       {
@@ -1066,7 +1115,8 @@ function updateCNode(horde_id, cnode_id, cnode_name, metadata)
         cnode_name = cnode_name,
         cnode_id = cnode_id,
         cnode_metadata = metadata,
-        cnode_block_no = cnode_info['cnode_block_no']
+        cnode_block_no = cnode_info['cnode_block_no'],
+        cnode_tx_id = cnode_info['cnode_tx_id']
       }
     }
   }
