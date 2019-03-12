@@ -26,7 +26,7 @@ local function __callFunction(module_name, func_name, ...)
     "__call_module_function__", module_name, func_name, ...)
 end
 
---[[ ============================================================================================================== ]]--
+--[[ ====================================================================== ]]--
 
 function constructor(manifestAddress)
   __init__(manifestAddress)

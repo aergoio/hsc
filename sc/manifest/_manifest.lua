@@ -51,7 +51,7 @@ local function __getModuleAddress(name)
 end
 
 function __init_module__(module_name, address, ...)
-  if system.getCreator() ~= system.getSender() then
+  if system.getCreator() ~= system.getOrigin() then
     system.print(MODULE_NAME .. "__init_module__: ERROR: only the creator can initialize a module.")
     return
   end
