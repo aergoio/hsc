@@ -67,7 +67,7 @@ function constructor(manifestAddress)
             horde_id        TEXT NOT NULL,
             account_address TEXT NOT NULL,
             ac_detail       TEXT,
-            PRIMARY KEY (horde_id, account_address)
+            PRIMARY KEY (horde_id, account_address),
             FOREIGN KEY (horde_id) REFERENCES hordes(horde_id)
               ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
