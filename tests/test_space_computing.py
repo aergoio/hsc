@@ -39,51 +39,51 @@ def test_add_horde(setup):
         "who create it?": "YP",
         "what for?": "just for HSC test",
     }
-    response = call_function('addHorde', ['ogrima1', 'Ogrima', True, json.dumps(metadata)])
+    response = call_function('addCluster', ['ogrima1', 'Ogrima', True, json.dumps(metadata)])
     return_value = json.loads(response.detail)
-    print("Return of 'addHorde':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'addCluster':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getHorde', ['ogrima1'])
+    response = query_function('getCluster', ['ogrima1'])
     return_value = json.loads(response)
-    print("Return of 'getHorde':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getCluster':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
-    assert metadata['name'] == return_value['horde_metadata']['name']
-    assert metadata['who create it?'] == return_value['horde_metadata']['who create it?']
-    assert metadata['what for?'] == return_value['horde_metadata']['what for?']
+    assert metadata['name'] == return_value['cluster_metadata']['name']
+    assert metadata['who create it?'] == return_value['cluster_metadata']['who create it?']
+    assert metadata['what for?'] == return_value['cluster_metadata']['what for?']
 
 
 def test_update_horde(setup):
     print("test_update_horde:", hsc_address)
     metadata = {
-        "I will register CNodes below": [
+        "I will register Machines below": [
             "bbabam",
             "zzazan",
         ],
     }
     metadata_raw = json.dumps(metadata)
-    response = call_function('updateHorde', ['ogrima1', 'Thunder Bluff', True, metadata_raw])
+    response = call_function('updateCluster', ['ogrima1', 'Thunder Bluff', True, metadata_raw])
     return_value = json.loads(response.detail)
-    print("Return of 'updateHorde':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'updateCluster':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getHorde', ['ogrima1'])
+    response = query_function('getCluster', ['ogrima1'])
     return_value = json.loads(response)
-    print("Return of 'getHorde':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getCluster':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
-    assert metadata['I will register CNodes below'][0] == return_value['horde_metadata']['I will register CNodes below'][0]
-    assert metadata['I will register CNodes below'][1] == return_value['horde_metadata']['I will register CNodes below'][1]
+    assert metadata['I will register Machines below'][0] == return_value['cluster_metadata']['I will register Machines below'][0]
+    assert metadata['I will register Machines below'][1] == return_value['cluster_metadata']['I will register Machines below'][1]
 
 
-def test_create_cnode(setup):
-    print("test_create_cnode:", hsc_address)
+def test_create_machine(setup):
+    print("test_create_machine:", hsc_address)
 
-    cnode1_metadata = {
-        "id": "cnode1",
+    machine1_metadata = {
+        "id": "machine1",
         "name": "bbabam",
         "ip": "localhost",
         "port": {
@@ -93,28 +93,28 @@ def test_create_cnode(setup):
             "profile": 6060,
         },
     }
-    cnode1_metadata_raw = json.dumps(cnode1_metadata)
-    response = call_function('addCNode', ['ogrima1', 'cnode1', 'bbabam', cnode1_metadata_raw])
+    machine1_metadata_raw = json.dumps(machine1_metadata)
+    response = call_function('addMachine', ['ogrima1', 'machine1', 'bbabam', machine1_metadata_raw])
     return_value = json.loads(response.detail)
-    print("Return of 'addCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'addMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getCNode', ['ogrima1', 'cnode1'])
+    response = query_function('getMachine', ['ogrima1', 'machine1'])
     return_value = json.loads(response)
-    print("Return of 'getCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
-    assert cnode1_metadata['id'] == return_value['cnode_list'][0]['cnode_metadata']['id']
-    assert cnode1_metadata['name'] == return_value['cnode_list'][0]['cnode_metadata']['name']
-    assert cnode1_metadata['ip'] == return_value['cnode_list'][0]['cnode_metadata']['ip']
-    assert cnode1_metadata['port']['rpc'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rpc']
-    assert cnode1_metadata['port']['p2p'] == return_value['cnode_list'][0]['cnode_metadata']['port']['p2p']
-    assert cnode1_metadata['port']['rest'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rest']
-    assert cnode1_metadata['port']['profile'] == return_value['cnode_list'][0]['cnode_metadata']['port']['profile']
+    assert machine1_metadata['id'] == return_value['machine_list'][0]['machine_metadata']['id']
+    assert machine1_metadata['name'] == return_value['machine_list'][0]['machine_metadata']['name']
+    assert machine1_metadata['ip'] == return_value['machine_list'][0]['machine_metadata']['ip']
+    assert machine1_metadata['port']['rpc'] == return_value['machine_list'][0]['machine_metadata']['port']['rpc']
+    assert machine1_metadata['port']['p2p'] == return_value['machine_list'][0]['machine_metadata']['port']['p2p']
+    assert machine1_metadata['port']['rest'] == return_value['machine_list'][0]['machine_metadata']['port']['rest']
+    assert machine1_metadata['port']['profile'] == return_value['machine_list'][0]['machine_metadata']['port']['profile']
 
-    cnode2_metadata = {
-        "id": "cnode2",
+    machine2_metadata = {
+        "id": "machine2",
         "name": "zzazan",
         "ip": "127.0.0.1",
         "port": {
@@ -124,70 +124,70 @@ def test_create_cnode(setup):
             "profile": 6060,
         },
     }
-    cnode2_metadata_raw = json.dumps(cnode2_metadata)
-    response = call_function('addCNode', ['ogrima1', 'cnode2', 'zzazan', cnode2_metadata_raw])
+    machine2_metadata_raw = json.dumps(machine2_metadata)
+    response = call_function('addMachine', ['ogrima1', 'machine2', 'zzazan', machine2_metadata_raw])
     return_value = json.loads(response.detail)
-    print("Return of 'addCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'addMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getCNode', ['ogrima1', 'cnode2'])
+    response = query_function('getMachine', ['ogrima1', 'machine2'])
     return_value = json.loads(response)
-    print("Return of 'getCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
-    assert cnode2_metadata['id'] == return_value['cnode_list'][0]['cnode_metadata']['id']
-    assert cnode2_metadata['name'] == return_value['cnode_list'][0]['cnode_metadata']['name']
-    assert cnode2_metadata['ip'] == return_value['cnode_list'][0]['cnode_metadata']['ip']
-    assert cnode2_metadata['port']['rpc'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rpc']
-    assert cnode2_metadata['port']['p2p'] == return_value['cnode_list'][0]['cnode_metadata']['port']['p2p']
-    assert cnode2_metadata['port']['rest'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rest']
-    assert cnode2_metadata['port']['profile'] == return_value['cnode_list'][0]['cnode_metadata']['port']['profile']
+    assert machine2_metadata['id'] == return_value['machine_list'][0]['machine_metadata']['id']
+    assert machine2_metadata['name'] == return_value['machine_list'][0]['machine_metadata']['name']
+    assert machine2_metadata['ip'] == return_value['machine_list'][0]['machine_metadata']['ip']
+    assert machine2_metadata['port']['rpc'] == return_value['machine_list'][0]['machine_metadata']['port']['rpc']
+    assert machine2_metadata['port']['p2p'] == return_value['machine_list'][0]['machine_metadata']['port']['p2p']
+    assert machine2_metadata['port']['rest'] == return_value['machine_list'][0]['machine_metadata']['port']['rest']
+    assert machine2_metadata['port']['profile'] == return_value['machine_list'][0]['machine_metadata']['port']['profile']
 
-    response = query_function('getAllCNodes', ['ogrima1'])
+    response = query_function('getAllMachines', ['ogrima1'])
     return_value = json.loads(response)
-    print("Return of 'getAllCNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getAllMachines':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
-    assert cnode1_metadata['id'] == return_value['cnode_list'][0]['cnode_metadata']['id']
-    assert cnode1_metadata['name'] == return_value['cnode_list'][0]['cnode_metadata']['name']
-    assert cnode1_metadata['ip'] == return_value['cnode_list'][0]['cnode_metadata']['ip']
-    assert cnode1_metadata['port']['rpc'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rpc']
-    assert cnode1_metadata['port']['p2p'] == return_value['cnode_list'][0]['cnode_metadata']['port']['p2p']
-    assert cnode1_metadata['port']['rest'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rest']
-    assert cnode1_metadata['port']['profile'] == return_value['cnode_list'][0]['cnode_metadata']['port']['profile']
-    assert cnode2_metadata['id'] == return_value['cnode_list'][1]['cnode_metadata']['id']
-    assert cnode2_metadata['name'] == return_value['cnode_list'][1]['cnode_metadata']['name']
-    assert cnode2_metadata['ip'] == return_value['cnode_list'][1]['cnode_metadata']['ip']
-    assert cnode2_metadata['port']['rpc'] == return_value['cnode_list'][1]['cnode_metadata']['port']['rpc']
-    assert cnode2_metadata['port']['p2p'] == return_value['cnode_list'][1]['cnode_metadata']['port']['p2p']
-    assert cnode2_metadata['port']['rest'] == return_value['cnode_list'][1]['cnode_metadata']['port']['rest']
-    assert cnode2_metadata['port']['profile'] == return_value['cnode_list'][1]['cnode_metadata']['port']['profile']
+    assert machine1_metadata['id'] == return_value['machine_list'][0]['machine_metadata']['id']
+    assert machine1_metadata['name'] == return_value['machine_list'][0]['machine_metadata']['name']
+    assert machine1_metadata['ip'] == return_value['machine_list'][0]['machine_metadata']['ip']
+    assert machine1_metadata['port']['rpc'] == return_value['machine_list'][0]['machine_metadata']['port']['rpc']
+    assert machine1_metadata['port']['p2p'] == return_value['machine_list'][0]['machine_metadata']['port']['p2p']
+    assert machine1_metadata['port']['rest'] == return_value['machine_list'][0]['machine_metadata']['port']['rest']
+    assert machine1_metadata['port']['profile'] == return_value['machine_list'][0]['machine_metadata']['port']['profile']
+    assert machine2_metadata['id'] == return_value['machine_list'][1]['machine_metadata']['id']
+    assert machine2_metadata['name'] == return_value['machine_list'][1]['machine_metadata']['name']
+    assert machine2_metadata['ip'] == return_value['machine_list'][1]['machine_metadata']['ip']
+    assert machine2_metadata['port']['rpc'] == return_value['machine_list'][1]['machine_metadata']['port']['rpc']
+    assert machine2_metadata['port']['p2p'] == return_value['machine_list'][1]['machine_metadata']['port']['p2p']
+    assert machine2_metadata['port']['rest'] == return_value['machine_list'][1]['machine_metadata']['port']['rest']
+    assert machine2_metadata['port']['profile'] == return_value['machine_list'][1]['machine_metadata']['port']['profile']
 
 
-def test_drop_cnode(setup):
-    print("test_drop_cnode:", hsc_address)
+def test_drop_machine(setup):
+    print("test_drop_machine:", hsc_address)
 
-    response = call_function('dropCNode', ['ogrima1', 'cnode1'])
+    response = call_function('dropMachine', ['ogrima1', 'machine1'])
     return_value = json.loads(response.detail)
-    print("Return of 'dropCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'dropMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getCNode', ['ogrima1', 'cnode1'])
+    response = query_function('getMachine', ['ogrima1', 'machine1'])
     return_value = json.loads(response)
-    print("Return of 'getCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 404 == status_code
 
-    response = query_function('getAllCNodes', ['ogrima1'])
+    response = query_function('getAllMachines', ['ogrima1'])
     return_value = json.loads(response)
-    print("Return of 'getAllCNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getAllMachines':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
 
-    cnode2_metadata = {
-        "id": "cnode2",
+    machine2_metadata = {
+        "id": "machine2",
         "name": "no-zzazan",
         "ip": "localhost",
         "port": {
@@ -197,43 +197,43 @@ def test_drop_cnode(setup):
             "profile": 6060,
         },
     }
-    response = call_function('updateCNode', ['ogrima1', 'cnode2', None, json.dumps(cnode2_metadata)])
+    response = call_function('updateMachine', ['ogrima1', 'machine2', None, json.dumps(machine2_metadata)])
     return_value = json.loads(response.detail)
-    print("Return of 'updateCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'updateMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getCNode', ['ogrima1', 'cnode2'])
+    response = query_function('getMachine', ['ogrima1', 'machine2'])
     return_value = json.loads(response)
-    print("Return of 'getCNode':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getMachine':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
 
-    response = query_function('getAllCNodes', ['ogrima1'])
+    response = query_function('getAllMachines', ['ogrima1'])
     return_value = json.loads(response)
-    print("Return of 'getAllCNodes':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getAllMachines':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 200 == status_code
-    assert cnode2_metadata['id'] == return_value['cnode_list'][0]['cnode_metadata']['id']
-    assert cnode2_metadata['name'] == return_value['cnode_list'][0]['cnode_metadata']['name']
-    assert cnode2_metadata['ip'] == return_value['cnode_list'][0]['cnode_metadata']['ip']
-    assert cnode2_metadata['port']['rpc'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rpc']
-    assert cnode2_metadata['port']['p2p'] == return_value['cnode_list'][0]['cnode_metadata']['port']['p2p']
-    assert cnode2_metadata['port']['rest'] == return_value['cnode_list'][0]['cnode_metadata']['port']['rest']
-    assert cnode2_metadata['port']['profile'] == return_value['cnode_list'][0]['cnode_metadata']['port']['profile']
+    assert machine2_metadata['id'] == return_value['machine_list'][0]['machine_metadata']['id']
+    assert machine2_metadata['name'] == return_value['machine_list'][0]['machine_metadata']['name']
+    assert machine2_metadata['ip'] == return_value['machine_list'][0]['machine_metadata']['ip']
+    assert machine2_metadata['port']['rpc'] == return_value['machine_list'][0]['machine_metadata']['port']['rpc']
+    assert machine2_metadata['port']['p2p'] == return_value['machine_list'][0]['machine_metadata']['port']['p2p']
+    assert machine2_metadata['port']['rest'] == return_value['machine_list'][0]['machine_metadata']['port']['rest']
+    assert machine2_metadata['port']['profile'] == return_value['machine_list'][0]['machine_metadata']['port']['profile']
 
 
 def test_drop_horde(setup):
     print("test_drop_pond:", hsc_address)
 
-    response = call_function('dropHorde', ['ogrima1'])
+    response = call_function('dropCluster', ['ogrima1'])
     return_value = json.loads(response.detail)
-    print("Return of 'dropHorde':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'dropCluster':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 201 == status_code
 
-    response = query_function('getHorde', ['ogrima1'])
+    response = query_function('getCluster', ['ogrima1'])
     return_value = json.loads(response)
-    print("Return of 'getHorde':\n{}".format(json.dumps(return_value, indent=2)))
+    print("Return of 'getCluster':\n{}".format(json.dumps(return_value, indent=2)))
     status_code = int(return_value["__status_code"])
     assert 404 == status_code

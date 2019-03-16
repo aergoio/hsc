@@ -65,7 +65,7 @@ function createUser(user_id, user_address, metadata)
 
   -- if not exist critical arguments, (400 Bad Request)
   --if isEmpty(user_id) then
-  if isEmpty(user_id) or sender ~= user_address then
+  if isEmpty(user_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
@@ -80,11 +80,35 @@ function createUser(user_id, user_address, metadata)
 
   -- find a user
   local res = getUser(user_id)
+  local is_the_first_time = false
+  local exist_sender = false
   system.print(MODULE_NAME .. "createUser: res=" .. json:encode(res))
-  if "200" == res["__status_code"] then
-    return updateUser(user_id, user_address, metadata)
-  elseif "404" ~= res["__status_code"] then
+  if "404" == res["__status_code"] then
+    is_the_first_time = true
+  elseif "200" == res["__status_code"] then
+    for _, info in pairs(res['user_info_list']) do
+      local ua = info['user_address']
+      if ua == sender then
+        exist_sender = true
+        break
+      end
+    end
+  else
     return res
+  end
+
+  -- check permissions (403.1 Execute access forbidden)
+  if not is_the_first_time and not exist_sender then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "createUser",
+      __status_code = "403",
+      __status_sub_code = "1",
+      __err_msg = "sender doesn't allow to create a new user",
+      sender = sender,
+      user_id = user_id,
+    }
   end
 
   -- tx id
@@ -120,6 +144,86 @@ function createUser(user_id, user_address, metadata)
   }
 end
 
+function findUsersInternal(user_address)
+  system.print(MODULE_NAME .. "findUsersInternal: user_address=" .. tostring(user_address))
+
+  local sender = system.getSender()
+  local block_no = system.getBlockheight()
+  system.print(MODULE_NAME .. "getUser: sender=" .. tostring(sender)
+          .. ", block_no=" .. tostring(block_no))
+
+  -- if not exist critical arguments, (400 Bad Request)
+  if isEmpty(user_address) then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "findUsersInternal",
+      __status_code = "400",
+      __status_sub_code = "",
+      __err_msg = "bad request: miss critical arguments",
+      sender = sender,
+      user_address = user_address,
+    }
+  end
+
+  -- check permissions (403.2 Read access forbidden)
+  if sender ~= system.getCreator() then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "findUsersInternal",
+      __status_code = "403",
+      __status_sub_code = "2",
+      __err_msg = "sender doesn't allow to use this method",
+      sender = sender,
+      user_address = user_address,
+    }
+  end
+
+  -- check inserted commands
+  local rows = __callFunction(MODULE_NAME_DB, "select",
+    [[SELECT use_id, user_address FROM horde_users
+        WHERE user_id = (SELECT user_id 
+                          FROM horde_users
+                          WHERE user_address = ?)
+        ORDER BY user_id, create_block_no DESC]],
+    user_address)
+  local user_list = {}
+  local exist = false
+  for _, v in pairs(rows) do
+    table.insert(user_id_list, {
+      user_id = v[1],
+      user_address = v[2],
+    })
+    exist = true
+  end
+
+  -- if not exist, (404 Not Found)
+  if not exist then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "findUsersInternal",
+      __status_code = "404",
+      __status_sub_code = "",
+      __err_msg = "cannot find any user",
+      sender = sender,
+      user_address = user_address
+    }
+  end
+
+  return {
+    __module = MODULE_NAME,
+    __block_no = block_no,
+    __func_name = "findUsersInternal",
+    __status_code = "200",
+    __status_sub_code = "",
+    sender = sender,
+    user_address = user_address,
+    user_list = user_list,
+  }
+end
+
 function getUser(user_id)
   system.print(MODULE_NAME .. "getUser: user_id=" .. tostring(user_id))
 
@@ -147,7 +251,7 @@ function getUser(user_id)
     [[SELECT user_address, create_block_no, create_tx_id, metadata
         FROM horde_users
         WHERE user_id = ?
-        ORDER BY create_block_no]],
+        ORDER BY create_block_no DESC]],
     user_id)
   local user_info_list = {}
 
@@ -194,7 +298,7 @@ function getUser(user_id)
       __func_name = "getUser",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find the user (" .. user_id .. ")",
+      __err_msg = "cannot find the user",
       sender = sender,
       user_id = user_id
     }
@@ -222,8 +326,7 @@ function deleteUser(user_id, user_address)
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  --if isEmpty(user_id) then
-  if isEmpty(user_id) or sender ~= user_address then
+  if isEmpty(user_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
@@ -231,21 +334,6 @@ function deleteUser(user_id, user_address)
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
-      sender = sender,
-      user_id = user_id,
-      user_address = user_address,
-    }
-  end
-
-  -- check permissions (403.1 Execute access forbidden)
-  if sender ~= user_address then
-    return {
-      __module = MODULE_NAME,
-      __block_no = block_no,
-      __func_name = "deleteUser",
-      __status_code = "403",
-      __status_sub_code = "1",
-      __err_msg = "Sender (" .. sender .. ") doesn't allow to delete the user (" .. user_id .. ", " .. user_address .. ") info",
       sender = sender,
       user_id = user_id,
       user_address = user_address,
@@ -260,10 +348,33 @@ function deleteUser(user_id, user_address)
   end
 
   local user_info = nil
+  local exist_sender = false
   for _, info in pairs(res['user_info_list']) do
-    if user_info['user_address'] == user_address then
+    local ua = info['user_address']
+    if ua == user_address then
       user_info = info
     end
+    if ua == sender then
+      exist_sender = true
+    end
+    if user_info ~= nil and exist_sender then
+      break
+    end
+  end
+
+  -- check permissions (403.1 Execute access forbidden)
+  if not exist_sender then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "deleteUser",
+      __status_code = "403",
+      __status_sub_code = "1",
+      __err_msg = "sender doesn't allow to delete the user",
+      sender = sender,
+      user_id = user_id,
+      user_address = user_address,
+    }
   end
 
   -- if not exist, (404 Not Found)
@@ -274,8 +385,7 @@ function deleteUser(user_id, user_address)
       __func_name = "deleteUser",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find the user (" .. user_id .. ", "
-              .. user_address .. ")",
+      __err_msg = "cannot find the user",
       sender = sender,
       user_id = user_id,
       user_address = user_address,
@@ -284,7 +394,8 @@ function deleteUser(user_id, user_address)
 
   -- delete Pond
   __callFunction(MODULE_NAME_DB, "delete",
-    "DELETE FROM horde_users WHERE user_id = ?", user_id)
+    "DELETE FROM horde_users WHERE user_id = ? AND user_address = ?"
+    , user_id, user_address)
 
   -- TODO: save this activity
 
@@ -302,7 +413,7 @@ function deleteUser(user_id, user_address)
         user_address = user_address,
         create_block_no = user_info['create_block_no'],
         create_tx_id = user_info['create_tx_id'],
-        user_metadata = user_info['metadata'],
+        user_metadata = user_info['user_metadata'],
       },
     },
   }
@@ -323,7 +434,6 @@ function updateUser(user_id, user_address, metadata)
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  --if isEmpty(user_id) or sender ~= user_address then
   if isEmpty(user_id) then
     return {
       __module = MODULE_NAME,
@@ -338,21 +448,6 @@ function updateUser(user_id, user_address, metadata)
     }
   end
 
-  -- check permissions (403.3 Write access forbidden)
-  if sender ~= user_address then
-    return {
-      __module = MODULE_NAME,
-      __block_no = block_no,
-      __func_name = "updateUser",
-      __status_code = "403",
-      __status_sub_code = "3",
-      __err_msg = "Sender (" .. sender .. ") doesn't allow to update the user (" .. user_id .. ", " .. user_address .. ") info",
-      sender = sender,
-      user_id = user_id,
-      user_address = user_address,
-    }
-  end
-
   -- read created user info
   local res = getUser(user_id)
   system.print(MODULE_NAME .. "updateUser: res=" .. json:encode(res))
@@ -361,10 +456,33 @@ function updateUser(user_id, user_address, metadata)
   end
 
   local user_info = nil
+  local exist_sender = false
   for _, info in pairs(res['user_info_list']) do
-    if info['user_address'] == user_address then
+    local ua = info['user_address']
+    if ua == user_address then
       user_info = info
     end
+    if ua == sender then
+      exist_sender = true
+    end
+    if user_info ~= nil and exist_sender then
+      break
+    end
+  end
+
+  -- check permissions (403.3 Write access forbidden)
+  if not exist_sender then
+    return {
+      __module = MODULE_NAME,
+      __block_no = block_no,
+      __func_name = "updateUser",
+      __status_code = "403",
+      __status_sub_code = "3",
+      __err_msg = "sender doesn't allow to update the user info",
+      sender = sender,
+      user_id = user_id,
+      user_address = user_address,
+    }
   end
 
   -- if not exist, (404 Not Found)
@@ -375,8 +493,7 @@ function updateUser(user_id, user_address, metadata)
       __func_name = "updateUser",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find the user (" .. user_id .. ", "
-              .. user_address .. ")",
+      __err_msg = "cannot find the user",
       sender = sender,
       user_id = user_id,
       user_address = user_address,
@@ -412,4 +529,5 @@ function updateUser(user_id, user_address, metadata)
   }
 end
 
+abi.register(findUsersInternal)
 abi.register(createUser, getUser, deleteUser, updateUser)

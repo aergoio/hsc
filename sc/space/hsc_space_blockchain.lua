@@ -33,46 +33,44 @@ function constructor(manifestAddress)
   system.print(MODULE_NAME
           .. "constructor: manifestAddress=" .. manifestAddress)
 
-  -- create Pond metadata table
+  -- create Chain metadata table
   --    * is_public = [1=public, 0=permissioned]
-  --    * metadata  = [genesis info,]
   __callFunction(MODULE_NAME_DB, "createTable",
-    [[CREATE TABLE IF NOT EXISTS horde_ponds(
-            creator         TEXT NOT NULL,
-            pond_name       TEXT,
-            pond_id         TEXT NOT NULL,
-            is_public       INTEGER DEFAULT 0,
-            pond_block_no   INTEGER DEFAULT NULL,
-            pond_tx_id      TEXT NOT NULL,
-            metadata        TEXT,
-            PRIMARY KEY (pond_id)
+    [[CREATE TABLE IF NOT EXISTS chains(
+            chain_creator   TEXT NOT NULL,
+            chain_name      TEXT,
+            chain_id        TEXT NOT NULL,
+            chain_is_public INTEGER DEFAULT 0,
+            chain_block_no  INTEGER DEFAULT NULL,
+            chain_tx_id     TEXT NOT NULL,
+            chain_metadata  TEXT,
+            PRIMARY KEY (chain_id)
   )]])
 
-  -- create BNode metadata table
-  --    * metadata = [cnode_info,]
+  -- create Node metadata table
   __callFunction(MODULE_NAME_DB, "createTable",
-    [[CREATE TABLE IF NOT EXISTS horde_bnodes(
-            pond_id         TEXT NOT NULL,
-            creator         TEXT NOT NULL,
-            bnode_name      TEXT,
-            bnode_id        TEXT NOT NULL,
-            bnode_block_no  INTEGER DEFAULT NULL,
-            bnode_tx_id     TEXT NOT NULL,
-            metadata        TEXT,
-            PRIMARY KEY (pond_id, bnode_id),
-            FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
+    [[CREATE TABLE IF NOT EXISTS nodes(
+            chain_id        TEXT NOT NULL,
+            node_creator    TEXT NOT NULL,
+            node_name       TEXT,
+            node_id         TEXT NOT NULL,
+            node_block_no   INTEGER DEFAULT NULL,
+            node_tx_id      TEXT NOT NULL,
+            node_metadata   TEXT,
+            PRIMARY KEY (chain_id, node_id),
+            FOREIGN KEY (chain_id) REFERENCES chains(chain_id)
               ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 
-  -- create Pond access control table
+  -- create Chain access control table
   --    * ac_detail = [TODO: categorize all object and then designate (CREATE/READ/WRITE/DELETE)]
   __callFunction(MODULE_NAME_DB, "createTable",
-    [[CREATE TABLE IF NOT EXISTS horde_ponds_ac_list(
-            pond_id         TEXT NOT NULL,
+    [[CREATE TABLE IF NOT EXISTS chains_ac_list(
+            chain_id        TEXT NOT NULL,
             account_address TEXT NOT NULL,
             ac_detail       TEXT,
-            PRIMARY KEY (pond_id, account_address)
-            FOREIGN KEY (pond_id) REFERENCES horde_ponds(pond_id)
+            PRIMARY KEY (chain_id, account_address)
+            FOREIGN KEY (chain_id) REFERENCES chains(chain_id)
               ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
 end
@@ -81,25 +79,25 @@ local function isEmpty(v)
   return nil == v or 0 == string.len(v)
 end
 
-local function generateDposGenesisJson(pond_info)
+local function generateDposGenesisJson(chain_info)
   system.print(MODULE_NAME
-          .. "generateDposGenesisJson: pond_info=" .. json:encode(pond_info))
+          .. "generateDposGenesisJson: chain_info=" .. json:encode(chain_info))
 
-  local pond_metadata = pond_info['pond_metadata']
-  local bp_cnt = pond_metadata['bp_cnt']
-  local genesis_json = pond_metadata['genesis_json']
+  local chain_metadata = chain_info['chain_metadata']
+  local bp_cnt = chain_metadata['bp_cnt']
+  local genesis_json = chain_metadata['genesis_json']
 
-  if nil ~= pond_metadata and nil ~= genesis_json then
+  if nil ~= chain_metadata and nil ~= genesis_json then
     if bp_cnt == table.getn(genesis_json['bps']) then
       return genesis_json
     end
   end
 
-  local bnode_list = pond_info['bnode_list']
+  local node_list = chain_info['node_list']
   local bp_list = {}
-  for _, bnode in pairs(bnode_list) do
-    local bnode_metadata = bnode['bnode_metadata']
-    if bnode_metadata['is_bp'] then
+  for _, bnode in pairs(node_list) do
+    local node_metadata = bnode['node_metadata']
+    if node_metadata['is_bp'] then
       table.insert(bp_list, bnode)
     end
   end
@@ -107,19 +105,19 @@ local function generateDposGenesisJson(pond_info)
   if bp_cnt <= table.getn(bp_list) then
     local genesis = {
       chain_id = {
-        version = pond_metadata['pond_version'],
-        magic = pond_info['pond_name'],
-        public = pond_info['is_public'],
-        mainnet = pond_metadata['is_mainnet'],
+        version = chain_metadata['chain_version'],
+        magic = chain_info['chain_name'],
+        public = chain_info['chain_is_public'],
+        mainnet = chain_metadata['is_mainnet'],
         consensus = 'dpos',
-        coinbasefee = pond_metadata['coinbase_fee']
+        coinbasefee = chain_metadata['coinbase_fee']
       },
       balance = {},
       bps = {}
     }
 
     -- generate balance list
-    for _, b in pairs(pond_metadata['balance_list']) do
+    for _, b in pairs(chain_metadata['balance_list']) do
       local address = b['address']
       local balance = b['balance']
 
@@ -128,7 +126,7 @@ local function generateDposGenesisJson(pond_info)
 
     -- generate BP list
     for i = 1, bp_cnt do
-      table.insert(genesis['bps'], bp_list[i]['bnode_metadata']['server_id'])
+      table.insert(genesis['bps'], bp_list[i]['node_metadata']['server_id'])
     end
 
     return genesis
@@ -137,41 +135,53 @@ local function generateDposGenesisJson(pond_info)
   end
 end
 
-function createPond(pond_id, pond_name, is_public, metadata)
+function createChain(chain_id, chain_name, is_public, metadata)
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
   local metadata_raw = json:encode(metadata)
-  system.print(MODULE_NAME .. "createPond: pond_id=" .. tostring(pond_id)
-          .. ", pond_name=" .. tostring(pond_name)
+  system.print(MODULE_NAME .. "createChain: chain_id=" .. tostring(chain_id)
+          .. ", chain_name=" .. tostring(chain_name)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
   local creator = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "createPond: creator=" .. creator
+  system.print(MODULE_NAME .. "createChain: creator=" .. creator
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) then
+  if isEmpty(chain_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "createPond",
+      __func_name = "createChain",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = creator,
-      pond_id = pond_id
+      chain_id = chain_id
     }
   end
 
-  -- read created Pond
-  local res = getPond(pond_id)
-  system.print(MODULE_NAME .. "createPond: res=" .. json:encode(res))
+  -- check new nodes
+  local new_node_list = metadata['new_node_list']
+  if nil == new_node_list then
+    new_node_list = {}
+  else
+    metadata["new_node_list"] = nil
+    metadata_raw = json:encode(metadata)
+  end
+  system.print(MODULE_NAME
+          .. "createChain: new_node_list="
+          .. json:encode(new_node_list))
+
+  -- read created Chain
+  local res = getChain(chain_id)
+  system.print(MODULE_NAME .. "createChain: res=" .. json:encode(res))
 
   if "404" == res["__status_code"] then
-    -- check whether Pond is public
+    -- check whether Chain is public
     local is_public_value = 0
     if is_public then
       is_public_value = 1
@@ -181,59 +191,49 @@ function createPond(pond_id, pond_name, is_public, metadata)
 
     -- tx id
     local tx_id = system.getTxhash()
-    system.print(MODULE_NAME .. "createPond: tx_id=" .. tx_id)
+    system.print(MODULE_NAME .. "createChain: tx_id=" .. tx_id)
 
     __callFunction(MODULE_NAME_DB, "insert",
-      [[INSERT INTO horde_ponds(creator,
-                                pond_name,
-                                pond_id,
-                                is_public,
-                                pond_block_no,
-                                pond_tx_id,
-                                metadata)
+      [[INSERT INTO chains(chain_creator,
+                                chain_name,
+                                chain_id,
+                                chain_is_public,
+                                chain_block_no,
+                                chain_tx_id,
+                                chain_metadata)
                VALUES (?, ?, ?, ?, ?, ?, ?)]],
-      creator, pond_name, pond_id, is_public_value,
+      creator, chain_name, chain_id, is_public_value,
       block_no, tx_id, metadata_raw)
   end
 
-  local created_bnode_list = metadata['created_bnode_list']
-  if nil == created_bnode_list then
-    created_bnode_list = {}
-  else
-    metadata["created_bnode_list"] = nil
-  end
-  system.print(MODULE_NAME
-          .. "createPond: created_bnode_list="
-          .. json:encode(created_bnode_list))
+  -- check and insert the created Node info from Horde
+  for _, bnode in pairs(new_node_list) do
+    local node_id = bnode['node_id']
+    local node_name = bnode['node_name']
+    local node_metadata = bnode['node_metadata']
 
-  -- check and insert the created BNode info from Horde
-  for _, bnode in pairs(created_bnode_list) do
-    local bnode_id = bnode['bnode_id']
-    local bnode_name = bnode['bnode_name']
-    local bnode_metadata = bnode['bnode_metadata']
-
-    createBNode(pond_id, bnode_id, bnode_name, bnode_metadata)
+    createNode(chain_id, node_id, node_name, node_metadata)
   end
 
-  -- read created all BNodes of Pond
-  local res = getAllBNodes(pond_id)
-  system.print(MODULE_NAME .. "createPond: res=" .. json:encode(res))
+  -- read created all Nodes of Chain
+  local res = getAllNodes(chain_id)
+  system.print(MODULE_NAME .. "createChain: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
     return res
   end
 
-  local pond_metadata = metadata
+  local chain_metadata = metadata
 
-  local consensus_alg = pond_metadata['consensus_alg']
+  local consensus_alg = chain_metadata['consensus_alg']
   if consensus_alg ~= nil then
     if 'dpos' == consensus_alg then
-      pond_metadata['genesis_json'] = generateDposGenesisJson(res)
+      chain_metadata['genesis_json'] = generateDposGenesisJson(res)
     elseif 'raft' == consensus_alg then
     elseif 'poa' == consensus_alg then
     elseif 'pow' == consensus_alg then
     end
 
-    updatePond(pond_id, pond_name, is_public, pond_metadata)
+    updateChain(chain_id, chain_name, is_public, chain_metadata)
   end
 
   -- TODO: save this activity
@@ -242,64 +242,64 @@ function createPond(pond_id, pond_name, is_public, metadata)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "createPond",
+    __func_name = "createChain",
     __status_code = "201",
     __status_sub_code = "",
-    pond_creator = res['pond_creator'],
-    pond_id = res['pond_id'],
-    pond_name = res['pond_name'],
-    pond_metadata = pond_metadata,
-    pond_block_no = res['pond_block_no'],
-    pond_tx_id = res['pond_tx_id'],
-    is_public = res['is_public'],
-    bnode_list = res['bnode_list'],
+    chain_creator = res['chain_creator'],
+    chain_id = res['chain_id'],
+    chain_name = res['chain_name'],
+    chain_metadata = chain_metadata,
+    chain_block_no = res['chain_block_no'],
+    chain_tx_id = res['chain_tx_id'],
+    chain_is_public = res['chain_is_public'],
+    node_list = res['node_list'],
   }
 end
 
-function getPublicPonds()
-  system.print(MODULE_NAME .. "getPublicPonds")
+function getPublicChains()
+  system.print(MODULE_NAME .. "getPublicChains")
 
-  local pond_list = {}
+  local chain_list = {}
   local exist = false
 
-  -- check all public Ponds
+  -- check all public Chains
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT pond_id, pond_name, creator, metadata,
-              pond_block_no, pond_tx_id
-        FROM horde_ponds
-        WHERE is_public = 1
-        ORDER BY pond_block_no]])
+    [[SELECT chain_id, chain_name, chain_creator, chaine_metadata,
+              chain_block_no, chain_tx_id
+        FROM chains
+        WHERE chain_is_public = 1
+        ORDER BY chain_block_no DESC]])
 
   for _, v in pairs(rows) do
-    local pond_id = v[1]
-    local bnode_list = {}
+    local chain_id = v[1]
+    local node_list = {}
 
-    local res = getAllBNodes(pond_id)
-    system.print(MODULE_NAME .. "getPublicPonds: res=" .. json:encode(res))
+    local res = getAllNodes(chain_id)
+    system.print(MODULE_NAME .. "getPublicChains: res=" .. json:encode(res))
     if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
       return res
     elseif "200" == res["__status_code"] then
-      bnode_list = res['bnode_list']
+      node_list = res['node_list']
     end
 
     local pond = {
-      pond_id = v[1],
-      pond_name = v[2],
-      pond_creator = v[3],
-      pond_metadata = json:decode(v[4]),
-      pond_block_no = v[5],
-      pond_tx_id = v[6],
-      is_public = true,
-      bnode_list = bnode_list,
+      chain_id = v[1],
+      chain_name = v[2],
+      chain_creator = v[3],
+      chain_metadata = json:decode(v[4]),
+      chain_block_no = v[5],
+      chain_tx_id = v[6],
+      chain_is_public = true,
+      node_list = node_list,
     }
-    table.insert(pond_list, pond)
+    table.insert(chain_list, pond)
 
     exist = true
   end
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getPublicPonds: sender=" .. tostring(sender)
+  system.print(MODULE_NAME .. "getPublicChains: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
 
   -- if not exist, (404 Not Found)
@@ -307,10 +307,10 @@ function getPublicPonds()
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getPublicPonds",
+      __func_name = "getPublicChains",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find any public blockchain",
+      __err_msg = "cannot find any public chain",
       sender = sender
     }
   end
@@ -319,30 +319,30 @@ function getPublicPonds()
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "getPublicPonds",
+    __func_name = "getPublicChains",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
-    pond_list = pond_list
+    chain_list = chain_list
   }
 end
 
-function getAllPonds(creator)
-  system.print(MODULE_NAME .. "getAllPonds: creator=" .. tostring(creator))
+function getAllChains(creator)
+  system.print(MODULE_NAME .. "getAllChains: creator=" .. tostring(creator))
 
-  -- check all public Ponds
-  local res = getPublicPonds()
-  system.print(MODULE_NAME .. "getAllPonds: res=" .. json:encode(res))
+  -- check all public Chains
+  local res = getPublicChains()
+  system.print(MODULE_NAME .. "getAllChains: res=" .. json:encode(res))
   if isEmpty(creator) then
     return res
   end
 
-  local pond_list
+  local chain_list
   local exist = false
   if "404" == res["__status_code"] then
-    pond_list = {}
+    chain_list = {}
   elseif "200" == res["__status_code"] then
-    pond_list = res["pond_list"]
+    chain_list = res["chain_list"]
     exist = true
   else
     return res
@@ -350,42 +350,42 @@ function getAllPonds(creator)
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getAllPonds: sender=" .. tostring(sender)
+  system.print(MODULE_NAME .. "getAllChains: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
 
-  -- check all creator's private Ponds
+  -- check all creator's private Chains
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT pond_id, pond_name, metadata,
-              pond_block_no, pond_tx_id
-        FROM horde_ponds
-        WHERE creator= ? AND is_public = 0
-        ORDER BY pond_block_no]],
+    [[SELECT chain_id, chain_name, chaine_metadata,
+              chain_block_no, chain_tx_id
+        FROM chains
+        WHERE chain_creator= ? AND chain_is_public = 0
+        ORDER BY chain_block_no DESC]],
     creator)
 
   for _, v in pairs(rows) do
-    local pond_id = v[1]
-    local bnode_list = {}
+    local chain_id = v[1]
+    local node_list = {}
 
-    -- read all BNodes of Pond
-    local res = getAllBNodes(pond_id)
-    system.print(MODULE_NAME .. "getAllPonds: res=" .. json:encode(res))
+    -- read all Nodes of Chain
+    local res = getAllNodes(chain_id)
+    system.print(MODULE_NAME .. "getAllChains: res=" .. json:encode(res))
     if "200" ~= res["__status_code"] and "404" ~= res["__status_code"] then
       return res
     elseif "200" == res["__status_code"] then
-      bnode_list = res['bnode_list']
+      node_list = res['node_list']
     end
 
     local pond = {
-      pond_creator = creator,
-      pond_id = pond_id,
-      pond_name = v[2],
-      pond_metadata = json:decode(v[3]),
-      pond_block_no = v[4],
-      pond_tx_id = v[5],
-      is_public = false,
-      bnode_list = bnode_list,
+      chain_creator = creator,
+      chain_id = chain_id,
+      chain_name = v[2],
+      chain_metadata = json:decode(v[3]),
+      chain_block_no = v[4],
+      chain_tx_id = v[5],
+      chain_is_public = false,
+      node_list = node_list,
     }
-    table.insert(pond_list, pond)
+    table.insert(chain_list, pond)
 
     exist = true
   end
@@ -395,12 +395,12 @@ function getAllPonds(creator)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getAllPonds",
+      __func_name = "getAllChains",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find any blockchain",
+      __err_msg = "cannot find any chain",
       sender = sender,
-      creator = creator,
+      chain_creator = creator,
     }
   end
 
@@ -408,64 +408,64 @@ function getAllPonds(creator)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "getAllHordes",
+    __func_name = "getAllChains",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
-    pond_list = pond_list
+    chain_list = chain_list
   }
 end
 
-function getPond(pond_id)
-  system.print(MODULE_NAME .. "getPond: pond_id=" .. tostring(pond_id))
+function getChain(chain_id)
+  system.print(MODULE_NAME .. "getChain: chain_id=" .. tostring(chain_id))
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getPond: sender=" .. tostring(sender)
+  system.print(MODULE_NAME .. "getChain: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) then
+  if isEmpty(chain_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getPond",
+      __func_name = "getChain",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
+      chain_id = chain_id,
     }
   end
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT creator, pond_name, is_public, metadata,
-              pond_block_no, pond_tx_id
-        FROM horde_ponds
-        WHERE pond_id = ?
-        ORDER BY pond_block_no]], pond_id)
-  local creator
-  local pond_name
-  local is_public
-  local metadata
-  local pond_block_no
-  local pond_tx_id
+    [[SELECT chain_creator, chain_name, chain_is_public, chain_metadata,
+              chain_block_no, chain_tx_id
+        FROM chains
+        WHERE chain_id = ?
+        ORDER BY chain_block_no DESC]], chain_id)
+  local chain_creator
+  local chain_name
+  local chain_is_public
+  local chain_metadata
+  local chain_block_no
+  local chain_tx_id
 
   local exist = false
   for _, v in pairs(rows) do
-    creator = v[1]
-    pond_name = v[2]
+    chain_creator = v[1]
+    chain_name = v[2]
 
     if 1 == v[3] then
-      is_public = true
+      chain_is_public = true
     else
-      is_public = false
+      chain_is_public = false
     end
 
-    metadata = json:decode(v[4])
-    pond_block_no = v[5]
-    pond_tx_id = v[6]
+    chain_metadata = json:decode(v[4])
+    chain_block_no = v[5]
+    chain_tx_id = v[6]
 
     exist = true
   end
@@ -478,12 +478,12 @@ function getPond(pond_id)
       return {
         __module = MODULE_NAME,
         __block_no = block_no,
-        __func_name = "getPond",
+        __func_name = "getChain",
         __status_code = "403",
         __status_sub_code = "2",
-        __err_msg = "Sender (" .. sender .. ") doesn't allow to read the blockchain (" .. pond_id .. ")",
+        __err_msg = "Sender (" .. sender .. ") doesn't allow to read the chain (" .. chain_id .. ")",
         sender = sender,
-        pond_id = pond_id
+        chain_id = chain_id
       }
     end
   end
@@ -494,12 +494,12 @@ function getPond(pond_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getPond",
+      __func_name = "getChain",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find the blockchain (" .. pond_id .. ")",
+      __err_msg = "cannot find the chain",
       sender = sender,
-      pond_id = pond_id
+      chain_id = chain_id
     }
   end
 
@@ -507,69 +507,69 @@ function getPond(pond_id)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "getPond",
+    __func_name = "getChain",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = creator,
-    pond_id = pond_id,
-    pond_name = pond_name,
-    pond_metadata = metadata,
-    pond_block_no = pond_block_no,
-    pond_tx_id = pond_tx_id,
-    is_public = is_public
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = chain_name,
+    chain_metadata = chain_metadata,
+    chain_block_no = chain_block_no,
+    chain_tx_id = chain_tx_id,
+    chain_is_public = chain_is_public
   }
 end
 
-function deletePond(pond_id)
-  system.print(MODULE_NAME .. "deletePond: pond_id=" .. tostring(pond_id))
+function deleteChain(chain_id)
+  system.print(MODULE_NAME .. "deleteChain: chain_id=" .. tostring(chain_id))
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "deletePond: sender=" .. sender
+  system.print(MODULE_NAME .. "deleteChain: sender=" .. sender
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) then
+  if isEmpty(chain_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "deletePond",
+      __func_name = "deleteChain",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
+      chain_id = chain_id,
     }
   end
 
-  -- read created Pond
-  local res = getPond(pond_id)
+  -- read created Chain
+  local res = getChain(chain_id)
   if "200" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "deletePond: res=" .. json:encode(res))
+  system.print(MODULE_NAME .. "deleteChain: res=" .. json:encode(res))
 
-  local creator = res["pond_creator"]
+  local chain_creator = res["chain_creator"]
 
   -- check permissions (403.1 Execute access forbidden)
-  if sender ~= creator then
+  if sender ~= chain_creator then
     -- TODO: check sender's delete permission of pond
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "deletePond",
+      __func_name = "deleteChain",
       __status_code = "403",
       __status_sub_code = "1",
-      __err_msg = "Sender (" .. sender .. ") doesn't allow to delete the blockchain (" .. pond_id .. ")",
+      __err_msg = "sender doesn't allow to delete the chain",
       sender = sender,
-      pond_id = pond_id
+      chain_id = chain_id
     }
   end
 
-  -- delete Pond
+  -- delete Chain
   __callFunction(MODULE_NAME_DB, "delete",
-    "DELETE FROM horde_ponds WHERE pond_id = ?", pond_id)
+    "DELETE FROM chains WHERE chain_id = ?", chain_id)
 
   -- TODO: save this activity
 
@@ -577,80 +577,80 @@ function deletePond(pond_id)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "deletePond",
+    __func_name = "deleteChain",
     __status_code = "201",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = creator,
-    pond_id = pond_id,
-    pond_name = res['pond_name'],
-    pond_metadata = res['pond_metadata'],
-    pond_block_no = res['pond_block_no'],
-    pond_tx_id = res['pond_tx_id'],
-    is_public = res['is_public']
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = res['chain_name'],
+    chain_metadata = res['chain_metadata'],
+    chain_block_no = res['chain_block_no'],
+    chain_tx_id = res['chain_tx_id'],
+    chain_is_public = res['chain_is_public']
   }
 end
 
-function updatePond(pond_id, pond_name, is_public, metadata)
+function updateChain(chain_id, chain_name, is_public, metadata)
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
   local metadata_raw = json:encode(metadata)
-  system.print(MODULE_NAME .. "updatePond: pond_id=" .. tostring(pond_id)
-          .. ", pond_name=" .. tostring(pond_name)
+  system.print(MODULE_NAME .. "updateChain: chain_id=" .. tostring(chain_id)
+          .. ", chain_name=" .. tostring(chain_name)
           .. ", is_public=" .. tostring(is_public)
           .. ", metadata=" .. metadata_raw)
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updatePond: sender=" .. sender
+  system.print(MODULE_NAME .. "updateChain: sender=" .. sender
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) then
+  if isEmpty(chain_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "updatePond",
+      __func_name = "updateChain",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
+      chain_id = chain_id,
     }
   end
 
-  -- read created Pond
-  local res = getPond(pond_id)
+  -- read created Chain
+  local res = getChain(chain_id)
   if "200" ~= res["__status_code"] then
     return res
   end
-  system.print(MODULE_NAME .. "updatePond: res=" .. json:encode(res))
+  system.print(MODULE_NAME .. "updateChain: res=" .. json:encode(res))
 
-  local creator = res["pond_creator"]
+  local chain_creator = res["chain_creator"]
 
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= creator then
+  if sender ~= chain_creator then
     -- TODO: check sender's update permission of pond
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "updatePond",
+      __func_name = "updateChain",
       __status_code = "403",
       __status_sub_code = "3",
-      __err_msg = "Sender (" .. sender .. ") doesn't allow to update the blockchain (" .. pond_id .. ") info",
+      __err_msg = "sender doesn't allow to update the chain info",
       sender = sender,
-      pond_id = pond_id
+      chain_id = chain_id
     }
   end
 
   -- check arguments
-  if isEmpty(pond_name) then
-    pond_name = res["pond_name"]
+  if isEmpty(chain_name) then
+    chain_name = res["chain_name"]
   end
 
   if nil == is_public then
-    is_public = res["is_public"]
+    is_public = res["chain_is_public"]
   end
 
   local is_public_value = 0
@@ -661,14 +661,14 @@ function updatePond(pond_id, pond_name, is_public, metadata)
   end
 
   if nil == metadata or isEmpty(metadata_raw) then
-    metadata = res["pond_metadata"]
+    metadata = res["chain_metadata"]
     metadata_raw = json:encode(metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "update",
-    [[UPDATE horde_ponds SET pond_name = ?, is_public = ?, metadata = ?
-        WHERE pond_id = ?]],
-    pond_name, is_public_value, metadata_raw, pond_id)
+    [[UPDATE chains SET chain_name = ?, chain_is_public = ?, chain_metadata = ?
+        WHERE chain_id = ?]],
+    chain_name, is_public_value, metadata_raw, chain_id)
 
   -- TODO: save this activity
 
@@ -676,91 +676,91 @@ function updatePond(pond_id, pond_name, is_public, metadata)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "updatePond",
+    __func_name = "updateChain",
     __status_code = "201",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = creator,
-    pond_id = pond_id,
-    pond_name = pond_name,
-    pond_metadata = metadata,
-    pond_block_no = res['pond_block_no'],
-    pond_tx_id = res['pond_tx_id'],
-    is_public = is_public
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = chain_name,
+    chain_metadata = metadata,
+    chain_block_no = res['chain_block_no'],
+    chain_tx_id = res['chain_tx_id'],
+    chain_is_public = is_public
   }
 end
 
-function createBNode(pond_id, bnode_id, bnode_name, metadata)
+function createNode(chain_id, node_id, node_name, metadata)
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
   local metadata_raw = json:encode(metadata)
-  system.print(MODULE_NAME .. "createBNode: pond_id=" .. tostring(pond_id)
-          .. ", bnode_id=" .. tostring(bnode_id)
-          .. ", bnode_name=" .. tostring(bnode_name)
+  system.print(MODULE_NAME .. "createNode: chain_id=" .. tostring(chain_id)
+          .. ", node_id=" .. tostring(node_id)
+          .. ", node_name=" .. tostring(node_name)
           .. ", metadata=" .. metadata_raw)
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "createBNode: sender=" .. sender
+  system.print(MODULE_NAME .. "createNode: sender=" .. sender
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) or isEmpty(bnode_id) then
+  if isEmpty(chain_id) or isEmpty(node_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "createBNode",
+      __func_name = "createNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
-      bnode_id = bnode_id,
+      chain_id = chain_id,
+      node_id = node_id,
     }
   end
 
-  -- read created Pond
-  local res = getPond(pond_id)
-  system.print(MODULE_NAME .. "createBNode: res=" .. json:encode(res))
+  -- read created Chain
+  local res = getChain(chain_id)
+  system.print(MODULE_NAME .. "createNode: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
   end
 
-  local pond_creator = res["pond_creator"]
-  local is_public = res["is_public"]
+  local chain_creator = res["chain_creator"]
+  local chain_is_public = res["chain_is_public"]
 
   -- check permissions (403.1 Execute access forbidden)
-  if sender ~= pond_creator then
-    if not is_public then
-      -- TODO: check sender's create BNode permission of pond
+  if sender ~= chain_creator then
+    if not chain_is_public then
+      -- TODO: check sender's create Node permission of pond
       return {
         __module = MODULE_NAME,
         __block_no = block_no,
-        __func_name = "createBNode",
+        __func_name = "createNode",
         __status_code = "403",
         __status_sub_code = "1",
-        __err_msg = "Sender (" .. sender .. ") doesn't allow to create a new blockchain node for the blockchain (" .. pond_id .. ")",
+        __err_msg = "sender doesn't allow to create a new node for the chain",
         sender = sender,
-        pond_id = pond_id
+        chain_id = chain_id
       }
     end
   end
 
   -- tx id
   local tx_id = system.getTxhash()
-  system.print(MODULE_NAME .. "createBNode: tx_id=" .. tx_id)
+  system.print(MODULE_NAME .. "createNode: tx_id=" .. tx_id)
 
   __callFunction(MODULE_NAME_DB, "insert",
-    [[INSERT INTO horde_bnodes(pond_id,
-                               creator,
-                               bnode_name,
-                               bnode_id,
-                               bnode_block_no,
-                               bnode_tx_id,
-                               metadata)
+    [[INSERT INTO nodes(chain_id,
+                               node_creator,
+                               node_name,
+                               node_id,
+                               node_block_no,
+                               node_tx_id,
+                               node_metadata)
              VALUES (?, ?, ?, ?, ?, ?, ?)]],
-    pond_id, sender, bnode_name, bnode_id,
+    chain_id, sender, node_name, node_id,
     block_no, tx_id, metadata_raw)
 
   -- TODO: save this activity
@@ -769,87 +769,87 @@ function createBNode(pond_id, bnode_id, bnode_name, metadata)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "createBNode",
+    __func_name = "createNode",
     __status_code = "201",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = pond_creator,
-    pond_id = pond_id,
-    pond_name = res['pond_name'],
-    pond_metadata = res['pond_metadata'],
-    pond_block_no = res['pond_block_no'],
-    pond_tx_id = res['pond_tx_id'],
-    is_public = is_public,
-    bnode_list = {
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = res['chain_name'],
+    chain_metadata = res['chain_metadata'],
+    chain_block_no = res['chain_block_no'],
+    chain_tx_id = res['chain_tx_id'],
+    chain_is_public = chain_is_public,
+    node_list = {
       {
-        bnode_creator = sender,
-        bnode_name = bnode_name,
-        bnode_id = bnode_id,
-        bnode_metadata = metadata,
-        bnode_block_no = block_no,
-        bnode_tx_id = tx_id
+        node_creator = sender,
+        node_name = node_name,
+        node_id = node_id,
+        node_metadata = metadata,
+        node_block_no = block_no,
+        node_tx_id = tx_id
       }
     }
   }
 end
 
-function getAllBNodes(pond_id)
-  system.print(MODULE_NAME .. "getAllBNodes: pond_id=" .. tostring(pond_id))
+function getAllNodes(chain_id)
+  system.print(MODULE_NAME .. "getAllNodes: chain_id=" .. tostring(chain_id))
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getAllBNodes: sender=" .. tostring(sender)
+  system.print(MODULE_NAME .. "getAllNodes: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) then
+  if isEmpty(chain_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getAllBNodes",
+      __func_name = "getAllNodes",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
+      chain_id = chain_id,
     }
   end
 
-  -- read created Pond
-  local res = getPond(pond_id)
-  system.print(MODULE_NAME .. "getAllBNodes: res=" .. json:encode(res))
+  -- read created Chain
+  local res = getChain(chain_id)
+  system.print(MODULE_NAME .. "getAllNodes: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
   end
 
-  local pond_creator = res["pond_creator"]
-  local pond_name = res["pond_name"]
-  local is_public = res["is_public"]
-  local pond_metadata = res["pond_metadata"]
-  local pond_block_no = res["pond_block_no"]
-  local pond_tx_id = res['pond_tx_id']
+  local chain_creator = res["chain_creator"]
+  local chain_name = res["chain_name"]
+  local chain_is_public = res["chain_is_public"]
+  local chain_metadata = res["chain_metadata"]
+  local chain_block_no = res["chain_block_no"]
+  local chain_tx_id = res['chain_tx_id']
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT creator, bnode_id, bnode_name, metadata,
-              bnode_block_no, bnode_tx_id
-        FROM horde_bnodes
-        WHERE pond_id = ? ORDER BY bnode_block_no]],
-    pond_id)
+    [[SELECT node_creator, node_id, node_name, node_metadata,
+              node_block_no, node_tx_id
+        FROM nodes
+        WHERE chain_id = ? ORDER BY node_block_no DESC]],
+    chain_id)
 
-  local bnode_list = {}
+  local node_list = {}
 
   local exist = false
   for _, v in pairs(rows) do
     local bnode = {
-      bnode_creator = v[1],
-      bnode_id = v[2],
-      bnode_name = v[3],
-      bnode_metadata = json:decode(v[4]),
-      bnode_block_no = v[5],
-      bnode_tx_id = v[6]
+      node_creator = v[1],
+      node_id = v[2],
+      node_name = v[3],
+      node_metadata = json:decode(v[4]),
+      node_block_no = v[5],
+      node_tx_id = v[6]
     }
-    table.insert(bnode_list, bnode)
+    table.insert(node_list, bnode)
 
     exist = true
   end
@@ -859,18 +859,18 @@ function getAllBNodes(pond_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getAllBNodes",
+      __func_name = "getAllNodes",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find any blockchain (" .. pond_id .. ") node info",
+      __err_msg = "cannot find any node in the chain",
       sender = sender,
-      pond_creator = pond_creator,
-      pond_id = pond_id,
-      pond_name = pond_name,
-      pond_metadata = pond_metadata,
-      pond_block_no = pond_block_no,
-      pond_tx_id = pond_tx_id,
-      is_public = is_public
+      chain_creator = chain_creator,
+      chain_id = chain_id,
+      chain_name = chain_name,
+      chain_metadata = chain_metadata,
+      chain_block_no = chain_block_no,
+      chain_tx_id = chain_tx_id,
+      chain_is_public = chain_is_public
     }
   end
 
@@ -878,81 +878,81 @@ function getAllBNodes(pond_id)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "getAllBNodes",
+    __func_name = "getAllNodes",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = pond_creator,
-    pond_id = pond_id,
-    pond_name = pond_name,
-    pond_metadata = pond_metadata,
-    pond_block_no = pond_block_no,
-    pond_tx_id = pond_tx_id,
-    is_public = is_public,
-    bnode_list = bnode_list
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = chain_name,
+    chain_metadata = chain_metadata,
+    chain_block_no = chain_block_no,
+    chain_tx_id = chain_tx_id,
+    chain_is_public = chain_is_public,
+    node_list = node_list
   }
 end
 
-function getBNode(pond_id, bnode_id)
-  system.print(MODULE_NAME .. "getBNode: pond_id=" .. tostring(pond_id)
-          .. ", bnode_id=" .. tostring(bnode_id))
+function getNode(chain_id, node_id)
+  system.print(MODULE_NAME .. "getNode: chain_id=" .. tostring(chain_id)
+          .. ", node_id=" .. tostring(node_id))
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getBNode: sender=" .. tostring(sender)
+  system.print(MODULE_NAME .. "getNode: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) or isEmpty(bnode_id) then
+  if isEmpty(chain_id) or isEmpty(node_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getBNode",
+      __func_name = "getNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
-      bnode_id = bnode_id,
+      chain_id = chain_id,
+      node_id = node_id,
     }
   end
 
-  -- read created Pond
-  local res = getPond(pond_id)
-  system.print(MODULE_NAME .. "getBNode: res=" .. json:encode(res))
+  -- read created Chain
+  local res = getChain(chain_id)
+  system.print(MODULE_NAME .. "getNode: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
   end
 
-  local pond_creator = res["pond_creator"]
-  local pond_name = res["pond_name"]
-  local is_public = res["is_public"]
-  local pond_metadata = res["pond_metadata"]
-  local pond_block_no = res["pond_block_no"]
-  local pond_tx_id = res['pond_tx_id']
+  local chain_creator = res["chain_creator"]
+  local chain_name = res["chain_name"]
+  local chain_is_public = res["chain_is_public"]
+  local chain_metadata = res["chain_metadata"]
+  local chain_block_no = res["chain_block_no"]
+  local chain_tx_id = res['chain_tx_id']
 
   -- check inserted data
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT creator, bnode_name, metadata,
-              bnode_block_no, bnode_tx_id
-        FROM horde_bnodes
-        WHERE pond_id = ? AND bnode_id = ?
-        ORDER BY bnode_block_no]],
-    pond_id, bnode_id)
+    [[SELECT node_creator, node_name, node_metadata,
+              node_block_no, node_tx_id
+        FROM nodes
+        WHERE chain_id = ? AND node_id = ?
+        ORDER BY node_block_no DESC]],
+    chain_id, node_id)
 
-  local bnode_list = {}
+  local node_list = {}
 
   local exist = false
   for _, v in pairs(rows) do
     local bnode = {
-      bnode_id = bnode_id,
-      bnode_creator = v[1],
-      bnode_name = v[2],
-      bnode_metadata = json:decode(v[3]),
-      bnode_block_no = v[4],
-      bnode_tx_id = v[5]
+      node_id = node_id,
+      node_creator = v[1],
+      node_name = v[2],
+      node_metadata = json:decode(v[3]),
+      node_block_no = v[4],
+      node_tx_id = v[5]
     }
-    table.insert(bnode_list, bnode)
+    table.insert(node_list, bnode)
 
     exist = true
   end
@@ -962,19 +962,19 @@ function getBNode(pond_id, bnode_id)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "getBNode",
+      __func_name = "getNode",
       __status_code = "404",
       __status_sub_code = "",
-      __err_msg = "cannot find the blockchain (" .. pond_id .. ") node (" .. bnode_id .. ") info",
+      __err_msg = "cannot find the node",
       sender = sender,
-      pond_creator = pond_creator,
-      pond_id = pond_id,
-      pond_name = pond_name,
-      pond_metadata = pond_metadata,
-      pond_block_no = pond_block_no,
-      pond_tx_id = pond_tx_id,
-      is_public = is_public,
-      bnode_id = bnode_id
+      chain_creator = chain_creator,
+      chain_id = chain_id,
+      chain_name = chain_name,
+      chain_metadata = chain_metadata,
+      chain_block_no = chain_block_no,
+      chain_tx_id = chain_tx_id,
+      chain_is_public = chain_is_public,
+      node_id = node_id
     }
   end
 
@@ -982,78 +982,78 @@ function getBNode(pond_id, bnode_id)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "getBNode",
+    __func_name = "getNode",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = pond_creator,
-    pond_id = pond_id,
-    pond_name = pond_name,
-    pond_metadata = pond_metadata,
-    pond_block_no = pond_block_no,
-    pond_tx_id = pond_tx_id,
-    is_public = is_public,
-    bnode_list = bnode_list
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = chain_name,
+    chain_metadata = chain_metadata,
+    chain_block_no = chain_block_no,
+    chain_tx_id = chain_tx_id,
+    chain_is_public = chain_is_public,
+    node_list = node_list
   }
 end
 
-function deleteBNode(pond_id, bnode_id)
-  system.print(MODULE_NAME .. "deleteBNode: pond_id=" .. tostring(pond_id)
-          .. ", bnode_id=" .. tostring(bnode_id))
+function deleteNode(chain_id, node_id)
+  system.print(MODULE_NAME .. "deleteNode: chain_id=" .. tostring(chain_id)
+          .. ", node_id=" .. tostring(node_id))
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "deleteBNode: sender=" .. sender
+  system.print(MODULE_NAME .. "deleteNode: sender=" .. sender
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) or isEmpty(bnode_id) then
+  if isEmpty(chain_id) or isEmpty(node_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "deleteBNode",
+      __func_name = "deleteNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
-      bnode_id = bnode_id,
+      chain_id = chain_id,
+      node_id = node_id,
     }
   end
 
-  -- read created BNode
-  local res = getBNode(pond_id, bnode_id)
-  system.print(MODULE_NAME .. "deleteBNode: res=" .. json:encode(res))
+  -- read created Node
+  local res = getNode(chain_id, node_id)
+  system.print(MODULE_NAME .. "deleteNode: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
   end
 
-  local pond_creator = res["pond_creator"]
-  local bnode_info = res["bnode_list"][1]
-  local bnode_creator = bnode_info["bnode_creator"]
+  local chain_creator = res["chain_creator"]
+  local node_info = res["node_list"][1]
+  local node_creator = node_info["node_creator"]
 
   -- check permissions (403.1 Execute access forbidden)
-  if sender ~= pond_creator then
-    if sender ~= bnode_creator then
+  if sender ~= chain_creator then
+    if sender ~= node_creator then
       -- TODO: check sender's delete permission of pond
       return {
         __module = MODULE_NAME,
         __block_no = block_no,
-        __func_name = "deleteBNode",
+        __func_name = "deleteNode",
         __status_code = "403",
         __status_sub_code = "1",
-        __err_msg = "Sender (" .. sender .. ") doesn't allow to delete the blockchain (" .. pond_id .. ") node",
+        __err_msg = "sender doesn't allow to delete the node",
         sender = sender,
-        pond_id = pond_id,
-        bnode_id = bnode_id
+        chain_id = chain_id,
+        node_id = node_id
       }
     end
   end
 
-  -- delete BNode
+  -- delete Node
   __callFunction(MODULE_NAME_DB, "delete",
-    "DELETE FROM horde_bnodes WHERE pond_id = ? AND bnode_id = ?",
-    pond_id, bnode_id)
+    "DELETE FROM nodes WHERE chain_id = ? AND node_id = ?",
+    chain_id, node_id)
 
   -- TODO: save this activity
 
@@ -1061,93 +1061,93 @@ function deleteBNode(pond_id, bnode_id)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "deleteBNode",
+    __func_name = "deleteNode",
     __status_code = "201",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = pond_creator,
-    pond_id = pond_id,
-    pond_name = res["pond_name"],
-    pond_metadata = res["pond_metadata"],
-    pond_block_no = res['pond_block_no'],
-    pond_tx_id = res['pond_tx_id'],
-    is_public = res["is_public"],
-    bnode_list = res["bnode_list"]
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = res["chain_name"],
+    chain_metadata = res["chain_metadata"],
+    chain_block_no = res['chain_block_no'],
+    chain_tx_id = res['chain_tx_id'],
+    chain_is_public = res["chain_is_public"],
+    node_list = res["node_list"]
   }
 end
 
-function updateBNode(pond_id, bnode_id, bnode_name, metadata)
+function updateNode(chain_id, node_id, node_name, metadata)
   if type(metadata) == 'string' then
     metadata = json:decode(metadata)
   end
   local metadata_raw = json:encode(metadata)
-  system.print(MODULE_NAME .. "updateBNode: pond_id=" .. tostring(pond_id)
-          .. ", bnode_id=" .. tostring(bnode_id)
-          .. ", bnode_name=" .. tostring(bnode_name)
+  system.print(MODULE_NAME .. "updateNode: chain_id=" .. tostring(chain_id)
+          .. ", node_id=" .. tostring(node_id)
+          .. ", node_name=" .. tostring(node_name)
           .. ", metadata=" .. metadata_raw)
 
   local sender = system.getOrigin()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "updateBNode: sender=" .. sender
+  system.print(MODULE_NAME .. "updateNode: sender=" .. sender
           .. ", block_no=" .. block_no)
 
   -- if not exist critical arguments, (400 Bad Request)
-  if isEmpty(pond_id) or isEmpty(bnode_id) then
+  if isEmpty(chain_id) or isEmpty(node_id) then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "updateBNode",
+      __func_name = "updateNode",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
       sender = sender,
-      pond_id = pond_id,
-      bnode_id = bnode_id,
+      chain_id = chain_id,
+      node_id = node_id,
     }
   end
 
-  -- read created BNode
-  local res = getBNode(pond_id, bnode_id)
-  system.print(MODULE_NAME .. "updateBNode: res=" .. json:encode(res))
+  -- read created Node
+  local res = getNode(chain_id, node_id)
+  system.print(MODULE_NAME .. "updateNode: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
   end
 
-  local pond_creator = res["pond_creator"]
-  local bnode_info = res["bnode_list"][1]
-  local bnode_creator = bnode_info["bnode_creator"]
+  local chain_creator = res["chain_creator"]
+  local node_info = res["node_list"][1]
+  local node_creator = node_info["node_creator"]
 
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= pond_creator then
-    if sender ~= bnode_creator then
+  if sender ~= chain_creator then
+    if sender ~= node_creator then
       -- TODO: check sender's update permission of pond
       return {
         __module = MODULE_NAME,
         __block_no = block_no,
-        __func_name = "updateBNode",
+        __func_name = "updateNode",
         __status_code = "403",
         __status_sub_code = "3",
-        __err_msg = "Sender (" .. sender .. ") doesn't allow to update the blockchain (" .. pond_id .. ") node info",
+        __err_msg = "sender doesn't allow to update the node info",
         sender = sender,
-        pond_id = pond_id,
-        bnode_id = bnode_id
+        chain_id = chain_id,
+        node_id = node_id
       }
     end
   end
 
   -- check arguments
-  if isEmpty(bnode_name) then
-    bnode_name = bnode_info["bnode_name"]
+  if isEmpty(node_name) then
+    node_name = node_info["node_name"]
   end
   if nil == metadata or isEmpty(metadata_raw) then
-    metadata = bnode_info["bnode_metadata"]
+    metadata = node_info["node_metadata"]
     metadata_raw = json:encode(metadata)
   end
 
   __callFunction(MODULE_NAME_DB, "update",
-    [[UPDATE horde_bnodes SET bnode_name = ?, metadata = ?
-        WHERE pond_id = ? AND bnode_id = ?]],
-    bnode_name, metadata_raw, pond_id, bnode_id)
+    [[UPDATE nodes SET node_name = ?, node_metadata = ?
+        WHERE chain_id = ? AND node_id = ?]],
+    node_name, metadata_raw, chain_id, node_id)
 
   -- TODO: save this activity
 
@@ -1155,31 +1155,31 @@ function updateBNode(pond_id, bnode_id, bnode_name, metadata)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "updateBNode",
+    __func_name = "updateNode",
     __status_code = "201",
     __status_sub_code = "",
     sender = sender,
-    pond_creator = pond_creator,
-    pond_id = pond_id,
-    pond_name = res["pond_name"],
-    pond_metadata = res["pond_metadata"],
-    pond_block_no = res['pond_block_no'],
-    pond_tx_id = res['pond_tx_id'],
-    is_public = res["is_public"],
-    bnode_list = {
+    chain_creator = chain_creator,
+    chain_id = chain_id,
+    chain_name = res["chain_name"],
+    chain_metadata = res["chain_metadata"],
+    chain_block_no = res['chain_block_no'],
+    chain_tx_id = res['chain_tx_id'],
+    chain_is_public = res["chain_is_public"],
+    node_list = {
       {
-        bnode_creator = bnode_creator,
-        bnode_name = bnode_name,
-        bnode_id = bnode_id,
-        bnode_metadata = metadata,
-        bnode_block_no = bnode_info['bnode_block_no'],
-        bnode_tx_id = bnode_info['bnode_tx_id']
+        node_creator = node_creator,
+        node_name = node_name,
+        node_id = node_id,
+        node_metadata = metadata,
+        node_block_no = node_info['node_block_no'],
+        node_tx_id = node_info['node_tx_id']
       }
     }
   }
 end
 
 -- exposed functions
-abi.register(createPond, getPublicPonds, getAllPonds,
-  getPond, deletePond, updatePond,
-  createBNode, getAllBNodes, getBNode, deleteBNode, updateBNode)
+abi.register(createChain, getPublicChains, getAllChains,
+  getChain, deleteChain, updateChain,
+  createNode, getAllNodes, getNode, deleteNode, updateNode)

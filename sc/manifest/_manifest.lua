@@ -20,18 +20,8 @@ local function __init__()
   stmt:exec(MODULE_NAME, scAddress)
 end
 
-local function __getModuleOwner()
-  return system.getItem(MODULE_NAME .. "__CREATOR__")
-end
-
 local function __callFunction(module_name, func_name, ...)
   system.print(MODULE_NAME .. "__callFunction: module_name=" .. module_name .. ", func_name=" .. func_name)
-
-  local module_owner = __getModuleOwner()
-  if sender ~= nil and string.len(sender) ~= 0 then
-    system.setItem(MODULE_NAME .. "__SENDER__", sender)
-    system.print(MODULE_NAME .. "__callFunction: sender(" .. sender .. ") calls owner(" .. module_owner .. ")'s module")
-  end
 
   return __call_module_function__(module_name, func_name, ...)
 end
