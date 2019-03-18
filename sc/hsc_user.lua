@@ -26,6 +26,12 @@ local function __callFunction(module_name, func_name, ...)
     "__call_module_function__", module_name, func_name, ...)
 end
 
+local function __getManifestAddress()
+  local address = _MANIFEST_ADDRESS:get()
+  system.print(MODULE_NAME .. "__getManifestAddress: address=" .. address) 
+  return address
+end
+
 --[[ ====================================================================== ]]--
 
 function constructor(manifestAddress)
@@ -38,9 +44,9 @@ function constructor(manifestAddress)
     [[CREATE TABLE IF NOT EXISTS horde_users(
             user_id         TEXT NOT NULL,
             user_address    TEXT NOT NULL,
-            create_block_no INTEGER DEFAULT NULL,
-            create_tx_id    TEXT NOT NULL,
-            metadata        TEXT,
+            user_block_no   INTEGER DEFAULT NULL,
+            user_tx_id      TEXT NOT NULL,
+            user_metadata   TEXT,
             PRIMARY KEY(user_id, user_address)
   )]])
 end
@@ -119,9 +125,9 @@ function createUser(user_id, user_address, metadata)
   __callFunction(MODULE_NAME_DB, "insert",
     [[INSERT INTO horde_users(user_id,
                               user_address,
-                              create_block_no,
-                              create_tx_id,
-                              metadata)
+                              user_block_no,
+                              user_tx_id,
+                              user_metadata)
              VALUES (?, ?, ?, ?, ?)]],
     user_id, user_address, block_no, tx_id, metadata_raw)
 
@@ -136,20 +142,20 @@ function createUser(user_id, user_address, metadata)
     user_info_list = {
       {
         user_address = user_address,
-        create_block_no = block_no,
-        create_tx_id = tx_id,
+        user_block_no = block_no,
+        user_tx_id = tx_id,
         user_metadata = metadata,
       },
     },
   }
 end
 
-function findUsersInternal(user_address)
-  system.print(MODULE_NAME .. "findUsersInternal: user_address=" .. tostring(user_address))
+function findUser(user_address)
+  system.print(MODULE_NAME .. "findUser: user_address=" .. tostring(user_address))
 
   local sender = system.getSender()
   local block_no = system.getBlockheight()
-  system.print(MODULE_NAME .. "getUser: sender=" .. tostring(sender)
+  system.print(MODULE_NAME .. "findUser: sender=" .. tostring(sender)
           .. ", block_no=" .. tostring(block_no))
 
   -- if not exist critical arguments, (400 Bad Request)
@@ -157,7 +163,7 @@ function findUsersInternal(user_address)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "findUsersInternal",
+      __func_name = "findUser",
       __status_code = "400",
       __status_sub_code = "",
       __err_msg = "bad request: miss critical arguments",
@@ -167,11 +173,11 @@ function findUsersInternal(user_address)
   end
 
   -- check permissions (403.2 Read access forbidden)
-  if sender ~= system.getCreator() then
+  if sender ~= __getManifestAddress() then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "findUsersInternal",
+      __func_name = "findUser",
       __status_code = "403",
       __status_sub_code = "2",
       __err_msg = "sender doesn't allow to use this method",
@@ -180,22 +186,29 @@ function findUsersInternal(user_address)
     }
   end
 
-  -- check inserted commands
+  -- check user ID
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT use_id, user_address FROM horde_users
-        WHERE user_id = (SELECT user_id 
-                          FROM horde_users
-                          WHERE user_address = ?)
-        ORDER BY user_id, create_block_no DESC]],
+    [[SELECT user_id FROM horde_users
+        WHERE user_address = ?]],
     user_address)
   local user_list = {}
   local exist = false
   for _, v in pairs(rows) do
-    table.insert(user_id_list, {
-      user_id = v[1],
-      user_address = v[2],
-    })
-    exist = true
+    local user_id = v[1]
+
+    local rows2 = __callFunction(MODULE_NAME_DB, "select",
+      [[SELECT user_address FROM horde_users
+          WHERE user_id = ?
+          ORDER BY user_block_no DESC]],
+      user_id)
+
+    for _, v2 in pairs(rows2) do
+      table.insert(user_list, {
+        user_id = user_id,
+        user_address = v2[1],
+      })
+      exist = true
+    end
   end
 
   -- if not exist, (404 Not Found)
@@ -203,7 +216,7 @@ function findUsersInternal(user_address)
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
-      __func_name = "findUsersInternal",
+      __func_name = "findUser",
       __status_code = "404",
       __status_sub_code = "",
       __err_msg = "cannot find any user",
@@ -215,7 +228,7 @@ function findUsersInternal(user_address)
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
-    __func_name = "findUsersInternal",
+    __func_name = "findUser",
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
@@ -248,10 +261,10 @@ function getUser(user_id)
 
   -- check inserted commands
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT user_address, create_block_no, create_tx_id, metadata
+    [[SELECT user_address, user_block_no, user_tx_id, user_metadata
         FROM horde_users
         WHERE user_id = ?
-        ORDER BY create_block_no DESC]],
+        ORDER BY user_block_no DESC]],
     user_id)
   local user_info_list = {}
 
@@ -262,8 +275,8 @@ function getUser(user_id)
 
     table.insert(user_info_list, {
       user_address = user_address,
-      create_block_no = v[2],
-      create_tx_id = v[3],
+      user_block_no = v[2],
+      user_tx_id = v[3],
       user_metadata = json:decode(v[4]),
     })
 
@@ -411,8 +424,8 @@ function deleteUser(user_id, user_address)
     user_info_list = {
       {
         user_address = user_address,
-        create_block_no = user_info['create_block_no'],
-        create_tx_id = user_info['create_tx_id'],
+        user_block_no = user_info['user_block_no'],
+        user_tx_id = user_info['user_tx_id'],
         user_metadata = user_info['user_metadata'],
       },
     },
@@ -503,7 +516,7 @@ function updateUser(user_id, user_address, metadata)
   -- update
   local block_no = system.getBlockheight()
   __callFunction(MODULE_NAME_DB, "update",
-    [[UPDATE horde_users SET metadata = ?
+    [[UPDATE horde_users SET user_metadata = ?
         WHERE user_id = ? AND user_address = ?]],
     metadata_raw, user_id, user_address)
 
@@ -521,13 +534,12 @@ function updateUser(user_id, user_address, metadata)
     user_info_list = {
       {
         user_address = user_address,
-        create_block_no = user_info['create_block_no'],
-        create_tx_id = user_info['create_tx_id'],
+        user_block_no = user_info['user_block_no'],
+        user_tx_id = user_info['user_tx_id'],
         user_metadata = metadata,
       },
     },
   }
 end
 
-abi.register(findUsersInternal)
-abi.register(createUser, getUser, deleteUser, updateUser)
+abi.register(createUser, findUser, getUser, deleteUser, updateUser)

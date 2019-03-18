@@ -118,7 +118,7 @@ function addCommand(cmd_type, cmd_body, target_list)
   system.print(MODULE_NAME .. "addCommand: cmd_id=" .. cmd_id)
 
   -- find orderer's all available addresses
-  local res = __callFunction(MODULE_NAME_USER, "findUsersInternal", orderer)
+  local res = __callFunction(MODULE_NAME_USER, "findUser", orderer)
   system.print(MODULE_NAME .. "addCommand: res=" .. json:encode(res))
   if "200" ~= res["__status_code"] then
     return res
@@ -165,6 +165,8 @@ function addCommand(cmd_type, cmd_body, target_list)
       owner = res["machine_list"][1]["machine_owner"]
       is_public = res["cluster_is_public"]
     end
+
+    system.print(MODULE_NAME .. "addCommand: owner=" .. tostring(owner))
 
     if not is_public then
       -- check orderer owns cluster and/or machine
@@ -247,6 +249,7 @@ function addCommand(cmd_type, cmd_body, target_list)
     __func_name = "addCommand",
     __status_code = "201",
     __status_sub_code = "",
+    sender = orderer,
     cmd_type = cmd_type,
     cmd_id = cmd_id,
     cmd_orderer = orderer,
@@ -383,25 +386,32 @@ function getCommand(cmd_id)
     }
   end
 
-  local target_list = {}
+  local cmd_list = {}
   rows = __callFunction(MODULE_NAME_DB, "select",
     [[SELECT cluster_id, machine_id, status, status_block_no, status_tx_id
         FROM command_targets
         WHERE cmd_id = ?
         ORDER BY status_block_no]], cmd_id)
   for _, v in pairs(rows) do
-    local target = {
+    local cmd = {
+      cmd_type = cmd_type,
+      cmd_id = cmd_id,
+      cmd_orderer = cmd_orderer,
+      cmd_block_no = cmd_block_no,
+      cmd_tx_id = cmd_tx_id,
+      cmd_body = cmd_body,
       cluster_id = v[1],
       machine_id = v[2],
       status = v[3],
       status_block_no = v[4],
       status_tx_id = v[5]
     }
-    table.insert(target_list, target)
+    table.insert(cmd_list, cmd)
 
     exist = true
   end
 
+  -- 200 OK
   return {
     __module = MODULE_NAME,
     __block_no = block_no,
@@ -409,12 +419,7 @@ function getCommand(cmd_id)
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
-    cmd_type = cmd_type,
-    cmd_id = cmd_id,
-    cmd_orderer = cmd_orderer,
-    cmd_block_no = cmd_block_no,
-    cmd_body = cmd_body,
-    target_list = target_list
+    cmd_list = cmd_list
   }
 end
 
@@ -528,9 +533,6 @@ function getCommandsOfTarget(cluster_id, machine_id, status)
     __status_code = "200",
     __status_sub_code = "",
     sender = sender,
-    cluster_id = cluster_id,
-    machine_id = machine_id,
-    status = status,
     cmd_list = cmd_list
   }
 end

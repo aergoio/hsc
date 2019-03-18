@@ -95,17 +95,21 @@ local function generateDposGenesisJson(chain_info)
 
   local node_list = chain_info['node_list']
   local bp_list = {}
-  for _, bnode in pairs(node_list) do
-    local node_metadata = bnode['node_metadata']
+  for _, node in pairs(node_list) do
+    local node_metadata = node['node_metadata']
     if node_metadata['is_bp'] then
-      table.insert(bp_list, bnode)
+      table.insert(bp_list, node)
     end
   end
+
+  local n_bp_list = table.getn(bp_list)
+  system.print(MODULE_NAME 
+          .. "generateDposGenesisJson: n_bp_list=" .. n_bp_list)
 
   if bp_cnt <= table.getn(bp_list) then
     local genesis = {
       chain_id = {
-        version = chain_metadata['chain_version'],
+        version = chain_metadata['version'],
         magic = chain_info['chain_name'],
         public = chain_info['chain_is_public'],
         mainnet = chain_metadata['is_mainnet'],
@@ -117,11 +121,11 @@ local function generateDposGenesisJson(chain_info)
     }
 
     -- generate balance list
-    for _, b in pairs(chain_metadata['balance_list']) do
+    for _, b in pairs(chain_metadata['coin_holders']) do
       local address = b['address']
-      local balance = b['balance']
+      local amount = b['amount']
 
-      genesis['balance'][address] = balance
+      genesis['balance'][address] = amount
     end
 
     -- generate BP list
@@ -207,10 +211,10 @@ function createChain(chain_id, chain_name, is_public, metadata)
   end
 
   -- check and insert the created Node info from Horde
-  for _, bnode in pairs(new_node_list) do
-    local node_id = bnode['node_id']
-    local node_name = bnode['node_name']
-    local node_metadata = bnode['node_metadata']
+  for _, node in pairs(new_node_list) do
+    local node_id = node['node_id']
+    local node_name = node['node_name']
+    local node_metadata = node['node_metadata']
 
     createNode(chain_id, node_id, node_name, node_metadata)
   end
@@ -264,7 +268,7 @@ function getPublicChains()
 
   -- check all public Chains
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT chain_id, chain_name, chain_creator, chaine_metadata,
+    [[SELECT chain_id, chain_name, chain_creator, chain_metadata,
               chain_block_no, chain_tx_id
         FROM chains
         WHERE chain_is_public = 1
@@ -355,7 +359,7 @@ function getAllChains(creator)
 
   -- check all creator's private Chains
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT chain_id, chain_name, chaine_metadata,
+    [[SELECT chain_id, chain_name, chain_metadata,
               chain_block_no, chain_tx_id
         FROM chains
         WHERE chain_creator= ? AND chain_is_public = 0
@@ -752,7 +756,7 @@ function createNode(chain_id, node_id, node_name, metadata)
   system.print(MODULE_NAME .. "createNode: tx_id=" .. tx_id)
 
   __callFunction(MODULE_NAME_DB, "insert",
-    [[INSERT INTO nodes(chain_id,
+    [[INSERT OR REPLACE INTO nodes(chain_id,
                                node_creator,
                                node_name,
                                node_id,
@@ -841,7 +845,7 @@ function getAllNodes(chain_id)
 
   local exist = false
   for _, v in pairs(rows) do
-    local bnode = {
+    local node = {
       node_creator = v[1],
       node_id = v[2],
       node_name = v[3],
@@ -849,7 +853,7 @@ function getAllNodes(chain_id)
       node_block_no = v[5],
       node_tx_id = v[6]
     }
-    table.insert(node_list, bnode)
+    table.insert(node_list, node)
 
     exist = true
   end
@@ -944,7 +948,7 @@ function getNode(chain_id, node_id)
 
   local exist = false
   for _, v in pairs(rows) do
-    local bnode = {
+    local node = {
       node_id = node_id,
       node_creator = v[1],
       node_name = v[2],
@@ -952,7 +956,7 @@ function getNode(chain_id, node_id)
       node_block_no = v[4],
       node_tx_id = v[5]
     }
-    table.insert(node_list, bnode)
+    table.insert(node_list, node)
 
     exist = true
   end
