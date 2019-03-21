@@ -47,7 +47,7 @@ function constructor(manifestAddress)
   )]])
  
   -- create command targets table
-  --  * status: INIT > EXECUTING > DONE
+  --  * status: INIT > EXEC > DONE
   __callFunction(MODULE_NAME_DB, "createTable",
     [[CREATE TABLE IF NOT EXISTS command_targets(
             cmd_id          TEXT NOT NULL,
@@ -564,16 +564,26 @@ function updateTarget(cmd_id, cluster_id, machine_id, status)
     }
   end
 
-  local res = getCommand(cmd_id)
-  system.print(MODULE_NAME .. "updateTarget: res=" .. json:encode(res))
-  if "200" ~= res["__status_code"] then
-    return res
+  local owner
+  if isEmpty(machine_id) then
+    local res = __callFunction(MODULE_NAME_CSPACE, "getCluster", cluster_id)
+    system.print(MODULE_NAME .. "addCommandResult: res=" .. json:encode(res))
+    if "200" ~= res["__status_code"] then
+      return res
+    end
+    owner = res["cluster_owner"]
+  else
+    local res = __callFunction(MODULE_NAME_CSPACE, "getMachine", 
+      cluster_id, machine_id)
+    system.print(MODULE_NAME .. "addCommandResult: res=" .. json:encode(res))
+    if "200" ~= res["__status_code"] then
+      return res
+    end
+    owner = res["machine_list"][1]["machine_owner"]
   end
 
-  local cmd_orderer = res["cmd_orderer"]
-
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= cmd_orderer then
+  if sender ~= owner then
     -- TODO: check sender's update permission of target
     return {
       __module = MODULE_NAME,
@@ -592,6 +602,15 @@ function updateTarget(cmd_id, cluster_id, machine_id, status)
 
   -- insert or replace
   local tx_id = system.getTxhash()
+  system.print(MODULE_NAME .. "updateTarget: tx_id=" .. tx_id)
+
+  local res = getCommand(cmd_id)
+  system.print(MODULE_NAME .. "updateTarget: res=" .. json:encode(res))
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+
+  local cmd = res['cmd_list'][1]
 
   __callFunction(MODULE_NAME_DB, "insert",
     [[INSERT OR REPLACE INTO command_targets (cmd_id,
@@ -612,11 +631,11 @@ function updateTarget(cmd_id, cluster_id, machine_id, status)
     __status_sub_code = "",
     sender = sender,
     cmd_id = cmd_id,
-    cmd_type = res["cmd_type"],
+    cmd_type = cmd["cmd_type"],
     cmd_orderer = cmd_orderer,
-    cmd_block_no = res["cmd_block_no"],
-    cmd_tx_id = res["cmd_tx_id"],
-    cmd_body = res["cmd_body"],
+    cmd_block_no = cmd["cmd_block_no"],
+    cmd_tx_id = cmd["cmd_tx_id"],
+    cmd_body = cmd["cmd_body"],
     cluster_id = cluster_id,
     machine_id = machine_id,
     status = status,
@@ -690,9 +709,20 @@ function addCommandResult(cmd_id, cluster_id, machine_id, result)
     }
   end
 
+  local res = getCommand(cmd_id)
+  system.print(MODULE_NAME .. "addCommandResult: res=" .. json:encode(res))
+  if "200" ~= res["__status_code"] then
+    return res
+  end
+
+  local cmd = res['cmd_list'][1]
+  if cmd['status'] == 'DONE' then
+    return getCommandResult(cmd_id)
+  end
+
   -- tx id is for command id
-  local result_id = system.getTxhash()
-  system.print(MODULE_NAME .. "addCommandResult: result_id=" .. result_id)
+  local tx_id = system.getTxhash()
+  system.print(MODULE_NAME .. "addCommandResult: tx_id=" .. tx_id)
 
   -- insert command result
   __callFunction(MODULE_NAME_DB, "insert",
@@ -704,7 +734,10 @@ function addCommandResult(cmd_id, cluster_id, machine_id, result)
                                   result_block_no,
                                   result_tx_id)
              VALUES (?, ?, ?, ?, ?, ?, ?)]],
-    cmd_id, cluster_id, machine_id, result_id, result_raw, block_no, result_id)
+    cmd_id, cluster_id, machine_id, tx_id, result_raw, block_no, tx_id)
+
+  -- update command status
+  updateTarget(cmd_id, cluster_id, machine_is, 'DONE')
 
   -- 201 Created
   return {
@@ -717,9 +750,9 @@ function addCommandResult(cmd_id, cluster_id, machine_id, result)
     cmd_id = cmd_id,
     cluster_id = cluster_id,
     machine_id = machine_id,
-    result_id = result_id,
+    result_id = tx_id,
     result_block_no = block_no,
-    result_tx_id = result_id,
+    result_tx_id = tx_id,
     result_body = result
   }
 end
@@ -752,7 +785,7 @@ function getCommandResult(cmd_id)
   end
   system.print(MODULE_NAME .. "getCommandResult: res=" .. json:encode(res))
 
-  local cmd_orderer = res["cmd_orderer"]
+  local cmd_orderer = res['cmd_list'][1]["cmd_orderer"]
 
   --[[ TODO: cannot check the sender of a query contract
   -- check permissions (403.2 Read access forbidden)
