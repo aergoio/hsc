@@ -632,7 +632,7 @@ function updateTarget(cmd_id, cluster_id, machine_id, status)
     sender = sender,
     cmd_id = cmd_id,
     cmd_type = cmd["cmd_type"],
-    cmd_orderer = cmd_orderer,
+    cmd_orderer = cmd['cmd_orderer'],
     cmd_block_no = cmd["cmd_block_no"],
     cmd_tx_id = cmd["cmd_tx_id"],
     cmd_body = cmd["cmd_body"],
