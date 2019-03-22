@@ -180,6 +180,13 @@ function createChain(chain_id, chain_name, is_public, metadata)
           .. "createChain: new_node_list="
           .. json:encode(new_node_list))
 
+  -- to shrink size of metadata
+  local node_list = metadata['node_list']
+  if nil ~= node_list then
+    metadata["node_list"] = nil
+    metadata_raw = json:encode(metadata)
+  end
+
   -- read created Chain
   local res = getChain(chain_id)
   system.print(MODULE_NAME .. "createChain: res=" .. json:encode(res))
@@ -666,6 +673,13 @@ function updateChain(chain_id, chain_name, is_public, metadata)
 
   if nil == metadata or isEmpty(metadata_raw) then
     metadata = res["chain_metadata"]
+    metadata_raw = json:encode(metadata)
+  end
+
+  -- to shrink size of metadata
+  local node_list = metadata['node_list']
+  if nil ~= node_list then
+    metadata["node_list"] = nil
     metadata_raw = json:encode(metadata)
   end
 
