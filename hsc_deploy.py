@@ -5,6 +5,8 @@ import traceback
 import json
 import aergo.herapy as herapy
 import time
+import string
+import random
 
 AERGO_TESTNET = "testnet.aergo.io:7845"
 #AERGO_SQLTESTNET = "sqltestnet.aergo.io:7845"
@@ -13,8 +15,7 @@ AERGO_SQLTESTNET = "13.209.137.193:7845"
 AERGO_TARGET = AERGO_TESTNET
 #AERGO_TARGET = AERGO_SQLTESTNET
 #AERGO_TARGET = "localhost:7845"
-AERGO_PRIVATE_KEY = "6iRFcHu3ptnSxMx7h54HM7YkkJvdUoTQsgF6LtsMkVK3eYeBwqk"
-AERGO_WAITING_TIME = 2
+AERGO_WAITING_TIME = 3
 
 if 'AERGO_TARGET' in os.environ:
     AERGO_TARGET = os.environ['AERGO_TARGET']
@@ -71,15 +72,25 @@ def write_payload_info(payload_info, payload_path):
         f.close()
 
 
-def check_aergo_conn_info(target, private_key):
+def check_aergo_conn_info(target, exported_key, password):
     aergo = herapy.Aergo()
     aergo.connect(target)
-    aergo.new_account(private_key=private_key)
+    if exported_key is None:
+        if password is None:
+            letters = string.ascii_letters
+            letters += string.digits
 
-    if private_key is None:
-        out_print("Account:")
-        out_print("  Private Key: " + str(aergo.account.private_key))
-        out_print("  Address: " + str(aergo.account.address))
+            password = ''.join(random.choice(letters) for _ in range(20))
+
+        aergo.new_account()
+    else:
+        aergo.import_account(exported_data=exported_key,
+                             password=password)
+    exported_key = aergo.export_account(password=password)
+
+    out_print("  > Account Info")
+    out_print("    - Exported Key: %s" % exported_key)
+    out_print("    - Password:     %s" % password)
 
     return aergo
 
@@ -245,19 +256,18 @@ def hsc_deploy(aergo, compiled_payload_file_path, deployed_payload_file_path):
 
 @click.group(invoke_without_command=True)
 @click.option('--target', default=AERGO_TARGET, help='target AERGO for Horde configuration')
-@click.option('--private-key', help='the private key to create Horde Smart Contract. If not set, it will be random')
+@click.option('--exported-key', help='the exported/encrypted key')
+@click.option('--password', help='the password of the exported/encrypted key')
 @click.option('--waiting-time', default=AERGO_WAITING_TIME, help='the private key to create Horde Smart Contract')
-def main(target, private_key, waiting_time):
+def main(target, exported_key, password, waiting_time):
     global AERGO_WAITING_TIME
     AERGO_WAITING_TIME = waiting_time
 
     aergo = None
     try:
-        aergo = check_aergo_conn_info(target, private_key)
+        aergo = check_aergo_conn_info(target, exported_key, password)
         aergo.get_account()
-        out_print("  > Account Info")
         out_print('    - Address:      %s' % aergo.account.address)
-        out_print('    - Private Key:  %s' % aergo.account.private_key)
         out_print('    - Nonce:        %s' % aergo.account.nonce)
         out_print('    - balance:      %s' % aergo.account.balance.aergo)
 

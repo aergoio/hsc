@@ -391,7 +391,7 @@ function deleteUser(user_id, user_address)
   end
 
   -- if not exist, (404 Not Found)
-  if nil == user_info then
+  if user_info == nil then
     return {
       __module = MODULE_NAME,
       __block_no = block_no,
