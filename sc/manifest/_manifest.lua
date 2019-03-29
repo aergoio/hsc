@@ -41,15 +41,8 @@ local function __getModuleAddress(name)
 end
 
 function __init_module__(module_name, address, ...)
-  if system.getCreator() ~= system.getOrigin() then
-    system.print(MODULE_NAME .. "__init_module__: ERROR: only the creator can initialize a module.")
-    return
-  end
-
-  if MODULE_NAME == module_name then
-    system.print(MODULE_NAME .. "__init_module__: ERROR: cannot initialize the Manifest module.")
-    return
-  end
+  assert(system.getCreator() == system.getOrigin(), "__init_module__:ERROR: only the creator can initialize a module.")
+  assert(MODULE_NAME ~= module_name, "__init_module__:ERROR: cannot initialize the Manifest module.")
 
   system.print(MODULE_NAME .. "__init_module__: initialize module:" .. module_name .. ", address=" .. address)
 
