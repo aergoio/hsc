@@ -501,7 +501,7 @@ function dropCluster(cluster_id)
   local cluster_owner = res["cluster_owner"]
 
   -- check permissions (403.1 Execute access forbidden)
-  if sender ~= cluster_owner then
+  if sender ~= cluster_owner and sender ~= cluster_id then
     -- TODO: check sender's deregister (drop) permission of horde
     return {
       __module = MODULE_NAME,
@@ -578,7 +578,7 @@ function updateCluster(cluster_id, cluster_name, is_public, metadata)
   local cluster_owner = res["cluster_owner"]
 
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= cluster_owner then
+  if sender ~= cluster_owner and sender ~= cluster_id then
     -- TODO: check sender's update permission of Horde
     return {
       __module = MODULE_NAME,
@@ -678,7 +678,7 @@ function addMachine(cluster_id, machine_id, machine_name, metadata)
   local cluster_owner = res["cluster_owner"]
 
   -- check permissions (403.1 Execute access forbidden)
-  if sender ~= cluster_owner then
+  if sender ~= cluster_owner and sender ~= cluster_id then
     -- TODO: check sender's register Machine permission of horde
     return {
       __module = MODULE_NAME,
@@ -979,8 +979,8 @@ function dropMachine(cluster_id, machine_id)
   local machine_owner = machine_info["machine_owner"]
 
   -- check permissions (403.1 Execute access forbidden)
-  if sender ~= cluster_owner then
-    if sender ~= machine_owner then
+  if sender ~= cluster_owner and sender ~= cluster_id then
+    if sender ~= machine_owner and sender ~= machine_id then
       -- TODO: check sender's deregister (drop) permission of horde Machine
       return {
         __module = MODULE_NAME,
@@ -1063,8 +1063,8 @@ function updateMachine(cluster_id, machine_id, machine_name, metadata)
   local machine_owner = machine_info["machine_owner"]
 
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= cluster_owner then
-    if sender ~= machine_owner then
+  if sender ~= cluster_owner and sender ~= cluster_id then
+    if sender ~= machine_owner and sender ~= machine_id then
       -- TODO: check sender's update permission of Horde
       return {
         __module = MODULE_NAME,
