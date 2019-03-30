@@ -575,14 +575,16 @@ function updateTarget(cmd_id, cluster_id, machine_id, target_index, status)
     }
   end
 
-  local owner
+  local c_or_m_owner
+  local c_or_m_id
   if isEmpty(machine_id) then
     local res = __callFunction(MODULE_NAME_CSPACE, "getCluster", cluster_id)
     system.print(MODULE_NAME .. "updateTarget: res=" .. json:encode(res))
     if "200" ~= res["__status_code"] then
       return res
     end
-    owner = res["cluster_owner"]
+    c_or_m_owner = res["cluster_owner"]
+    c_or_m_id = res["cluster_id"]
   else
     local res = __callFunction(MODULE_NAME_CSPACE, "getMachine", 
       cluster_id, machine_id)
@@ -590,11 +592,12 @@ function updateTarget(cmd_id, cluster_id, machine_id, target_index, status)
     if "200" ~= res["__status_code"] then
       return res
     end
-    owner = res["machine_list"][1]["machine_owner"]
+    c_or_m_owner = res["machine_list"][1]["machine_owner"]
+    c_or_m_id = res["machine_list"][1]["machine_id"]
   end
 
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= owner then
+  if sender ~= c_or_m_owner and sender ~= c_or_m_id then
     -- TODO: check sender's update permission of target
     return {
       __module = MODULE_NAME,
@@ -697,14 +700,16 @@ function addCommandResult(cmd_id, cluster_id, machine_id, target_index, result)
     }
   end
 
-  local owner
+  local c_or_m_owner
+  local c_or_m_id
   if isEmpty(machine_id) then
     local res = __callFunction(MODULE_NAME_CSPACE, "getCluster", cluster_id)
     system.print(MODULE_NAME .. "addCommandResult: res=" .. json:encode(res))
     if "200" ~= res["__status_code"] then
       return res
     end
-    owner = res["cluster_owner"]
+    c_or_m_owner = res["cluster_owner"]
+    c_or_m_id = res["cluster_id"]
   else
     local res = __callFunction(MODULE_NAME_CSPACE, "getMachine", 
       cluster_id, machine_id)
@@ -712,11 +717,12 @@ function addCommandResult(cmd_id, cluster_id, machine_id, target_index, result)
     if "200" ~= res["__status_code"] then
       return res
     end
-    owner = res["machine_list"][1]["machine_owner"]
+    c_or_m_owner = res["machine_list"][1]["machine_owner"]
+    c_or_m_id = res["machine_list"][1]["machine_id"]
   end
 
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= owner then
+  if sender ~= c_or_m_owner and sender ~= c_or_m_id then
     -- TODO: check sender is same with Horde owner or cNode owner
     return {
       __module = MODULE_NAME,
