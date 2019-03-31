@@ -5,6 +5,7 @@
 MODULE_NAME = "__HSC_SPACE_BLOCKCHAIN__"
 
 MODULE_NAME_DB = "__MANIFEST_DB__"
+MODULE_NAME_COMPUTING = "__HSC_SPACE_COMPUTING__"
 
 state.var {
   -- contant variables
@@ -223,7 +224,10 @@ function createChain(chain_id, chain_name, is_public, metadata)
     local node_name = node['node_name']
     local node_metadata = node['node_metadata']
 
-    createNode(chain_id, node_id, node_name, node_metadata)
+    local res = createNode(chain_id, node_id, node_name, node_metadata)
+    if "201" ~= res["__status_code"] then
+      return res
+    end
   end
 
   -- read created all Nodes of Chain
@@ -234,6 +238,7 @@ function createChain(chain_id, chain_name, is_public, metadata)
   end
 
   local chain_metadata = metadata
+  chain_metadata['node_list'] = res['node_list']
 
   local consensus_alg = chain_metadata['consensus_alg']
   if consensus_alg ~= nil then
@@ -244,7 +249,10 @@ function createChain(chain_id, chain_name, is_public, metadata)
     elseif 'pow' == consensus_alg then
     end
 
-    updateChain(chain_id, chain_name, is_public, chain_metadata)
+    local res2 = updateChain(chain_id, chain_name, is_public, chain_metadata)
+    if "201" ~= res["__status_code"] then
+      return res
+    end
   end
 
   -- TODO: save this activity
@@ -639,9 +647,20 @@ function updateChain(chain_id, chain_name, is_public, metadata)
   system.print(MODULE_NAME .. "updateChain: res=" .. json:encode(res))
 
   local chain_creator = res["chain_creator"]
+  local node_list = metadata['node_list']         
+  local found_c_or_m = false                      
+  for _, node in pairs(node_list) do              
+    local node_metadata = node['node_metadata']   
+    local cluster = node_metadata['cluster']      
+    local machine = node_metadata['machine']      
+    if sender == cluster['id'] or sender == machine['id'] then
+        found_c_or_m = true
+        break
+    end
+  end
 
   -- check permissions (403.3 Write access forbidden)
-  if sender ~= chain_creator then
+  if sender ~= chain_creator and not found_c_or_m then
     -- TODO: check sender's update permission of pond
     return {
       __module = MODULE_NAME,
@@ -748,8 +767,13 @@ function createNode(chain_id, node_id, node_name, metadata)
   local chain_creator = res["chain_creator"]
   local chain_is_public = res["chain_is_public"]
 
+  local cluster_id = metadata["cluster"]["id"]
+  local machine_id = metadata["machine"]["id"]
+
   -- check permissions (403.1 Execute access forbidden)
-  if sender ~= chain_creator then
+  if sender ~= chain_creator
+          and sender ~= cluster_id
+          and sender ~= machine_id then
     if not chain_is_public then
       -- TODO: check sender's create Node permission of pond
       return {
