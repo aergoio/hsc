@@ -647,15 +647,22 @@ function updateChain(chain_id, chain_name, is_public, metadata)
   system.print(MODULE_NAME .. "updateChain: res=" .. json:encode(res))
 
   local chain_creator = res["chain_creator"]
-  local node_list = metadata['node_list']         
-  local found_c_or_m = false                      
-  for _, node in pairs(node_list) do              
-    local node_metadata = node['node_metadata']   
-    local cluster = node_metadata['cluster']      
-    local machine = node_metadata['machine']      
+  local node_list = metadata['node_list']
+  local found_c_or_m = false
+  for _, node in pairs(node_list) do
+    local node_metadata = node['node_metadata']
+    local cluster
+    local machine
+    if node_metadata == nil then
+      cluster = node['cluster']
+      machine = node['machine']
+    else
+      cluster = node_metadata['cluster']
+      machine = node_metadata['machine']
+    end
     if sender == cluster['id'] or sender == machine['id'] then
-        found_c_or_m = true
-        break
+      found_c_or_m = true
+      break
     end
   end
 
