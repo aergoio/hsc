@@ -110,12 +110,10 @@ local function generateDposGenesisJson(chain_info)
   if bp_cnt <= table.getn(bp_list) then
     local genesis = {
       chain_id = {
-        version = chain_metadata['version'],
         magic = chain_info['chain_name'],
         public = chain_info['chain_is_public'],
         mainnet = chain_metadata['is_mainnet'],
         consensus = 'dpos',
-        coinbasefee = chain_metadata['coinbase_fee']
       },
       balance = {},
       bps = {}
@@ -374,12 +372,25 @@ function getAllChains(creator)
 
   -- check all creator's private Chains
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT chain_id, chain_name, chain_metadata,
+    [[SELECT DISTINCT chain_id, chain_name, chain_metadata,
               chain_block_no, chain_tx_id
         FROM chains
-        WHERE chain_creator= ? AND chain_is_public = 0
+          JOIN (
+            SELECT DISTINCT
+              clusters.cluster_id AS c_id,
+              machines.machine_id AS m_id
+            FROM clusters JOIN machines
+            WHERE clusters.cluster_owner=? OR machines.machine_owner=?
+          ) AS cm
+        WHERE
+          chains.chain_is_public = 0
+          AND (
+            chains.chain_creator=?
+            OR chains.chain_creator=cm.c_id
+            OR chains.chain_creator=cm.m_id
+          )
         ORDER BY chain_block_no DESC]],
-    creator)
+    creator, creator, creator)
 
   for _, v in pairs(rows) do
     local chain_id = v[1]
