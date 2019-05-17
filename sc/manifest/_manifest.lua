@@ -72,6 +72,13 @@ end
 
 function callFunction(module, functionName, ...)
   system.print(MODULE_NAME .. "callFunction: module=" .. module .. ", functionName=" .. functionName)
+  local ret = __callFunction(module, functionName, ...)
+  system.print(MODULE_NAME .. "event: module=" .. module .. ", ret=" .. json:encode(ret))
+  contract.event("HSC", module, system.getTxhash(), json:encode(ret))
+end
+
+function queryFunction(module, functionName, ...)
+  system.print(MODULE_NAME .. "callFunction: module=" .. module .. ", functionName=" .. functionName)
   return __callFunction(module, functionName, ...)
 end
 
@@ -86,4 +93,5 @@ function getVersion()
 end
 
 -- exposed functions
-abi.register(setVersion, getVersion, callFunction)
+abi.register(setVersion, callFunction)
+abi.register_view(getVersion, queryFunction)
