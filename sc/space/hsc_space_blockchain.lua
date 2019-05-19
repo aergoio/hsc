@@ -104,7 +104,7 @@ local function generateDposGenesisJson(chain_info)
   end
 
   local n_bp_list = table.getn(bp_list)
-  system.print(MODULE_NAME 
+  system.print(MODULE_NAME
           .. "generateDposGenesisJson: n_bp_list=" .. n_bp_list)
 
   if bp_cnt <= table.getn(bp_list) then
@@ -248,8 +248,8 @@ function createChain(chain_id, chain_name, is_public, metadata)
     end
 
     local res2 = updateChain(chain_id, chain_name, is_public, chain_metadata)
-    if "201" ~= res["__status_code"] then
-      return res
+    if "201" ~= res2["__status_code"] then
+      return res2
     end
   end
 
@@ -264,12 +264,14 @@ function createChain(chain_id, chain_name, is_public, metadata)
     __status_sub_code = "",
     chain_creator = res['chain_creator'],
     chain_id = res['chain_id'],
+    --[[
     chain_name = res['chain_name'],
     chain_metadata = chain_metadata,
     chain_block_no = res['chain_block_no'],
     chain_tx_id = res['chain_tx_id'],
     chain_is_public = res['chain_is_public'],
     node_list = res['node_list'],
+    ]]
   }
 end
 
@@ -613,11 +615,13 @@ function deleteChain(chain_id)
     sender = sender,
     chain_creator = chain_creator,
     chain_id = chain_id,
+    --[[
     chain_name = res['chain_name'],
     chain_metadata = res['chain_metadata'],
     chain_block_no = res['chain_block_no'],
     chain_tx_id = res['chain_tx_id'],
     chain_is_public = res['chain_is_public']
+    ]]
   }
 end
 
@@ -737,11 +741,13 @@ function updateChain(chain_id, chain_name, is_public, metadata)
     sender = sender,
     chain_creator = chain_creator,
     chain_id = chain_id,
+    --[[
     chain_name = chain_name,
     chain_metadata = metadata,
     chain_block_no = res['chain_block_no'],
     chain_tx_id = res['chain_tx_id'],
     chain_is_public = is_public
+    ]]
   }
 end
 
@@ -835,6 +841,9 @@ function createNode(chain_id, node_id, node_name, metadata)
     sender = sender,
     chain_creator = chain_creator,
     chain_id = chain_id,
+    node_creator = sender,
+    node_id = node_id,
+    --[[
     chain_name = res['chain_name'],
     chain_metadata = res['chain_metadata'],
     chain_block_no = res['chain_block_no'],
@@ -850,6 +859,7 @@ function createNode(chain_id, node_id, node_name, metadata)
         node_tx_id = tx_id
       }
     }
+    ]]
   }
 end
 
@@ -1127,12 +1137,16 @@ function deleteNode(chain_id, node_id)
     sender = sender,
     chain_creator = chain_creator,
     chain_id = chain_id,
+    node_creator = node_creator,
+    node_id = node_id,
+    --[[
     chain_name = res["chain_name"],
     chain_metadata = res["chain_metadata"],
     chain_block_no = res['chain_block_no'],
     chain_tx_id = res['chain_tx_id'],
     chain_is_public = res["chain_is_public"],
     node_list = res["node_list"]
+    ]]
   }
 end
 
@@ -1221,6 +1235,9 @@ function updateNode(chain_id, node_id, node_name, metadata)
     sender = sender,
     chain_creator = chain_creator,
     chain_id = chain_id,
+    node_creator = node_creator,
+    node_id = node_id,
+    --[[
     chain_name = res["chain_name"],
     chain_metadata = res["chain_metadata"],
     chain_block_no = res['chain_block_no'],
@@ -1236,6 +1253,7 @@ function updateNode(chain_id, node_id, node_name, metadata)
         node_tx_id = node_info['node_tx_id']
       }
     }
+    ]]
   }
 end
 

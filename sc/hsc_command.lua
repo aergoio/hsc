@@ -34,7 +34,7 @@ end
 function constructor(manifestAddress)
   __init__(manifestAddress)
   system.print(MODULE_NAME .. "constructor: manifestAddress=" .. manifestAddress)
- 
+
   -- create command table
   __callFunction(MODULE_NAME_DB, "createTable",
     [[CREATE TABLE IF NOT EXISTS commands(
@@ -45,7 +45,7 @@ function constructor(manifestAddress)
             cmd_tx_id     TEXT NOT NULL,
             cmd_body      TEXT NOT NULL
   )]])
- 
+
   -- create command targets table
   --  * status: INIT > EXEC > DONE
   __callFunction(MODULE_NAME_DB, "createTable",
@@ -61,7 +61,7 @@ function constructor(manifestAddress)
             FOREIGN KEY(cmd_id) REFERENCES commands(cmd_id)
               ON DELETE CASCADE ON UPDATE NO ACTION
   )]])
- 
+
   -- create command result table
   __callFunction(MODULE_NAME_DB, "createTable",
     [[CREATE TABLE IF NOT EXISTS command_results(
@@ -148,7 +148,7 @@ function addCommand(cmd_type, cmd_body, target_list)
             .. ", cluster_id=" .. cluster_id
             .. ", machine_id=" .. machine_id)
 
-    local owner 
+    local owner
     local is_public
     if isEmpty(machine_id) then
       local res = __callFunction(MODULE_NAME_CSPACE, "getCluster", cluster_id)
@@ -159,7 +159,7 @@ function addCommand(cmd_type, cmd_body, target_list)
       owner = res["cluster_owner"]
       is_public = res["cluster_is_public"]
     else
-      local res = __callFunction(MODULE_NAME_CSPACE, "getMachine", 
+      local res = __callFunction(MODULE_NAME_CSPACE, "getMachine",
         cluster_id, machine_id)
       system.print(MODULE_NAME .. "addCommand: res=" .. json:encode(res))
       if "200" ~= res["__status_code"] then
@@ -238,11 +238,11 @@ function addCommand(cmd_type, cmd_body, target_list)
 
     -- insert a system command for all Hordes
     __callFunction(MODULE_NAME_DB, "insert",
-      [[INSERT INTO command_targets(cmd_id, 
-                                    status, 
+      [[INSERT INTO command_targets(cmd_id,
+                                    status,
                                     status_block_no,
-                                    status_tx_id) 
-                VALUES (?, ?, ?, ?)]], 
+                                    status_tx_id)
+                VALUES (?, ?, ?, ?)]],
       cmd_id, "INIT", block_no, cmd_id)
   end
 
@@ -254,13 +254,15 @@ function addCommand(cmd_type, cmd_body, target_list)
     __status_code = "201",
     __status_sub_code = "",
     sender = orderer,
-    cmd_type = cmd_type,
     cmd_id = cmd_id,
     cmd_orderer = orderer,
+    --[[
+    cmd_type = cmd_type,
     cmd_block_no = block_no,
     cmd_tx_id = cmd_id,
     cmd_body = cmd_body,
     target_list = target_list
+    ]]
   }
 end
 
@@ -277,7 +279,7 @@ function getSystemCommands()
                         commands.cmd_tx_id, commands.cmd_body,
                         command_targets.cluster_id, command_targets.machine_id,
                         command_targets.status, command_targets.status_block_no,
-                        command_targets.status_tx_id, 
+                        command_targets.status_tx_id,
                         command_targets.target_index
                   FROM commands INNER JOIN command_targets
                   WHERE commands.cmd_id = command_targets.cmd_id
@@ -394,7 +396,7 @@ function getCommand(cmd_id)
 
   local cmd_list = {}
   rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT cluster_id, machine_id, status, status_block_no, status_tx_id, 
+    [[SELECT cluster_id, machine_id, status, status_block_no, status_tx_id,
               target_index
         FROM command_targets
         WHERE cmd_id = ?
@@ -586,7 +588,7 @@ function updateTarget(cmd_id, cluster_id, machine_id, target_index, status)
     c_or_m_owner = res["cluster_owner"]
     c_or_m_id = res["cluster_id"]
   else
-    local res = __callFunction(MODULE_NAME_CSPACE, "getMachine", 
+    local res = __callFunction(MODULE_NAME_CSPACE, "getMachine",
       cluster_id, machine_id)
     system.print(MODULE_NAME .. "updateTarget: res=" .. json:encode(res))
     if "200" ~= res["__status_code"] then
@@ -627,7 +629,7 @@ function updateTarget(cmd_id, cluster_id, machine_id, target_index, status)
 
   local cmd = res['cmd_list'][1]
 
-  local sql = [[UPDATE command_targets 
+  local sql = [[UPDATE command_targets
                    SET status=?, status_block_no=?, status_tx_id=?
                  WHERE cmd_id=? AND cluster_id=?]]
   if nil ~= machine_id then
@@ -655,6 +657,7 @@ function updateTarget(cmd_id, cluster_id, machine_id, target_index, status)
     __status_sub_code = "",
     sender = sender,
     cmd_id = cmd_id,
+    --[[
     cmd_type = cmd["cmd_type"],
     cmd_orderer = cmd['cmd_orderer'],
     cmd_block_no = cmd["cmd_block_no"],
@@ -666,6 +669,7 @@ function updateTarget(cmd_id, cluster_id, machine_id, target_index, status)
     status_block_no = block_no,
     status_tx_id = tx_id,
     target_index = target_index
+    ]]
   }
 end
 
@@ -711,7 +715,7 @@ function addCommandResult(cmd_id, cluster_id, machine_id, target_index, result)
     c_or_m_owner = res["cluster_owner"]
     c_or_m_id = res["cluster_id"]
   else
-    local res = __callFunction(MODULE_NAME_CSPACE, "getMachine", 
+    local res = __callFunction(MODULE_NAME_CSPACE, "getMachine",
       cluster_id, machine_id)
     system.print(MODULE_NAME .. "addCommandResult: res=" .. json:encode(res))
     if "200" ~= res["__status_code"] then
@@ -777,6 +781,8 @@ function addCommandResult(cmd_id, cluster_id, machine_id, target_index, result)
     __status_sub_code = "",
     sender = sender,
     cmd_id = cmd_id,
+    result_id = tx_id,
+    --[[
     cmd_type = res['cmd_type'],
     cmd_orderer = res['cmd_orderer'],
     cmd_block_no = res["cmd_block_no"],
@@ -788,10 +794,10 @@ function addCommandResult(cmd_id, cluster_id, machine_id, target_index, result)
     status_block_no = res['status_block_no'],
     status_tx_id = res['status_tx_id'],
     target_index = res['target_index'],
-    result_id = tx_id,
     result_block_no = block_no,
     result_tx_id = tx_id,
     result_body = result
+    ]]
   }
 end
 
@@ -843,7 +849,7 @@ function getCommandResult(cmd_id)
   ]]--
 
   local rows = __callFunction(MODULE_NAME_DB, "select",
-    [[SELECT cluster_id, machine_id, result_id, 
+    [[SELECT cluster_id, machine_id, result_id,
               result_block_no, result_tx_id, result_body
         FROM command_results
         WHERE cmd_id = ?
@@ -892,5 +898,5 @@ function getCommandResult(cmd_id)
   }
 end
 
-abi.register(addCommand, getSystemCommands, getCommand, getCommandsOfTarget, 
+abi.register(addCommand, getSystemCommands, getCommand, getCommandsOfTarget,
   updateTarget, addCommandResult, getCommandResult)

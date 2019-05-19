@@ -175,12 +175,14 @@ function addCluster(cluster_id, cluster_name, is_public, metadata)
     __status_sub_code = "",
     cluster_owner = res['cluster_owner'],
     cluster_id = res['cluster_id'],
+    --[[
     cluster_name = res['cluster_name'],
     cluster_metadata = res['cluster_metadata'],
     cluster_block_no = res['cluster_block_no'],
     cluster_tx_id = res['cluster_tx_id'],
     cluster_is_public = res['cluster_is_public'],
     machine_list = res['machine_list'],
+    ]]
   }
 end
 
@@ -531,11 +533,13 @@ function dropCluster(cluster_id)
     sender = sender,
     cluster_owner = cluster_owner,
     cluster_id = cluster_id,
+    --[[
     cluster_name = res['cluster_name'],
     cluster_metadata = res['cluster_metadata'],
     cluster_block_no = res['cluster_block_no'],
     cluster_tx_id = res['cluster_tx_id'],
     cluster_is_public = res['cluster_is_public']
+    ]]
   }
 end
 
@@ -630,11 +634,13 @@ function updateCluster(cluster_id, cluster_name, is_public, metadata)
     sender = sender,
     cluster_owner = cluster_owner,
     cluster_id = cluster_id,
+    --[[
     cluster_name = cluster_name,
     cluster_metadata = metadata,
     cluster_block_no = res['cluster_block_no'],
     cluster_tx_id = res['cluster_tx_id'],
     cluster_is_public = cluster_is_public
+    ]]
   }
 end
 
@@ -720,6 +726,9 @@ function addMachine(cluster_id, machine_id, machine_name, metadata)
     sender = sender,
     cluster_owner = cluster_owner,
     cluster_id = cluster_id,
+    machine_owner = sender,
+    machine_id = machine_id,
+    --[[
     cluster_name = res['cluster_name'],
     cluster_metadata = res['cluster_metadata'],
     cluster_block_no = res['cluster_block_no'],
@@ -735,6 +744,7 @@ function addMachine(cluster_id, machine_id, machine_name, metadata)
         machine_tx_id = tx_id
       }
     }
+    ]]
   }
 end
 
@@ -1013,12 +1023,16 @@ function dropMachine(cluster_id, machine_id)
     sender = sender,
     cluster_owner = cluster_owner,
     cluster_id = cluster_id,
+    machine_owner = machine_owner,
+    machine_id = machine_id
+    --[[
     cluster_name = res["cluster_name"],
     cluster_metadata = res["cluster_metadata"],
     cluster_block_no = res["cluster_block_no"],
     cluster_tx_id = res['cluster_tx_id'],
     cluster_is_public = res["cluster_is_public"],
     machine_list = res["machine_list"]
+    ]]
   }
 end
 
@@ -1106,6 +1120,9 @@ function updateMachine(cluster_id, machine_id, machine_name, metadata)
     sender = sender,
     cluster_owner = cluster_owner,
     cluster_id = cluster_id,
+    machine_owner = machine_owner,
+    machine_id = machine_id,
+    --[[
     cluster_name = res["cluster_name"],
     cluster_metadata = res["cluster_metadata"],
     cluster_block_no = res["cluster_block_no"],
@@ -1121,6 +1138,7 @@ function updateMachine(cluster_id, machine_id, machine_name, metadata)
         machine_tx_id = machine_info['machine_tx_id']
       }
     }
+    ]]
   }
 end
 
